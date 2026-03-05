@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { CopySwitchButton } from "@/components/copy-switch-button";
+import { OnlinePlayersDialog } from "@/components/online-players-dialog";
 import {
   Card,
   CardContent,
@@ -7,6 +10,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { formatDateDDMonthYear, formatTimeElapsed, rankBadgeUrl } from "@/lib/utils";
+import { PlayerSkin } from "@/components/player-skin";
 import type {
   PlayerMainStats,
   PlayerFullStats,
@@ -14,16 +26,6 @@ import type {
 } from "@/types/player";
 
 const FIXED_LOCALE = "en-US";
-const WYNN_API_BASE =
-  process.env.NEXT_PUBLIC_WYNN_API_BASE ?? "https://cdn.wynncraft.com";
-const MCVIEW3D_EMBED_BASE =
-  process.env.NEXT_PUBLIC_MCVIEW3D_EMBED_BASE ??
-  "https://kurojs.github.io/McView3D/embed.html";
-
-function rankBadgeUrl(path: string): string {
-  const clean = path.startsWith("/") ? path.slice(1) : path;
-  return `${WYNN_API_BASE}/${clean}`;
-}
 
 function formatPlaytime(hours: number): string {
   if (hours < 1) return `${Math.round(hours * 60)}m`;
@@ -38,100 +40,105 @@ function formatNumber(n: number | null | undefined): string {
   return n.toLocaleString(FIXED_LOCALE);
 }
 
-function McView3DCard({ username }: { username: string }) {
-  const embedSrc = `${MCVIEW3D_EMBED_BASE}?skin=${username}&width=400&height=400&animation=idle&cape=default`;
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Player model</CardTitle>
-        <CardDescription>3D skin preview (McView3D)</CardDescription>
-      </CardHeader>
-      <CardContent className="flex justify-center overflow-hidden rounded-lg bg-muted/30 p-2">
-        <iframe
-          src={embedSrc}
-          width={400}
-          height={400}
-          title={`${username} skin viewer`}
-          className="border-0 rounded"
-        />
-      </CardContent>
-    </Card>
-  );
-}
-
 export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
+  const [onlineDialogOpen, setOnlineDialogOpen] = useState(false);
+  const [onlineDialogServer, setOnlineDialogServer] = useState<string | null>(
+    null
+  );
+
+  const openOnlineDialog = (server: string) => {
+    setOnlineDialogServer(server);
+    setOnlineDialogOpen(true);
+  };
+
   return (
     <>
-      <McView3DCard username={mainStats.username} />
-      <Card>
-        <CardHeader>
-          <CardTitle>Overview</CardTitle>
-          <CardDescription>Account & status</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p className="flex items-center gap-2">
-            <span className="text-muted-foreground">Username</span>{" "}
-            {mainStats.rankBadge && (
+      <Card className="w-full">
+        <CardContent className="flex flex-col gap-4">
+          <p className="flex flex-wrap items-center justify-center gap-2">
+            {mainStats?.rankBadge && (
               <img
                 src={rankBadgeUrl(mainStats.rankBadge)}
                 alt={mainStats.rank}
-                className="h-5 w-auto inline-block align-middle"
+                className="h-6 w-auto inline-block align-middle"
               />
             )}
-            {mainStats.username}
-          </p>
-          <p>
-            <span className="text-muted-foreground">Rank</span>{" "}
-            {mainStats.rank}
-            {mainStats.supportRank && ` · ${mainStats.supportRank}`}
-            {mainStats.veteran === true && " (Veteran)"}
-          </p>
-          {mainStats.lastJoin && (
-            <p>
-              <span className="text-muted-foreground">Last join</span>{" "}
-              {mainStats.lastJoin}
-            </p>
-          )}
-          <p>
-            <span className="text-muted-foreground">Status</span>{" "}
             <span
-              className={
-                mainStats.online
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-muted-foreground"
-              }
+              className="font-minecraft inline-block px-1.5 py-0.5 text-2xl text-[#ffff55]"
+              style={{
+                textShadow:
+                  "1px 1px 0 #3f3f3f, -1px -1px 0 #3f3f3f, 1px -1px 0 #3f3f3f, -1px 1px 0 #3f3f3f",
+              }}
             >
-              {mainStats.online ? `Online · ${mainStats.server}` : "Offline"}
+              {mainStats.username}
             </span>
           </p>
-          {mainStats.activeCharacter && (
-            <p>
-              <span className="text-muted-foreground">Active</span>{" "}
-              {mainStats.activeCharacter}
-            </p>
-          )}
-          <p>
-            <span className="text-muted-foreground">Playtime</span>{" "}
-            {formatPlaytime(mainStats.playtime)}
-          </p>
-          <p>
-            <span className="text-muted-foreground">First join</span>{" "}
-            {mainStats.firstJoin}
-          </p>
-          {mainStats.rankBadge && (
-            <p className="flex items-center gap-2">
-              <span className="text-muted-foreground">Rank badge</span>{" "}
-              <img
-                src={rankBadgeUrl(mainStats.rankBadge)}
-                alt={mainStats.rank}
-                className="h-5 w-auto inline-block align-middle"
-              />
-            </p>
-          )}
+
+          <div className="flex justify-center">
+            <PlayerSkin username={mainStats.username} />
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-1 ">
+          <p className="text-2xl font-sans">Overview</p>
+          <p className="font-mono text-muted-foreground">Account & status</p>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-sans">Status</CardTitle>
+            <CardDescription className="flex gap-2 text-sm font-mono"> <p className="flex items-center gap-2">
+              {mainStats.online && mainStats.server ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openOnlineDialog(mainStats.server!)}
+                    className="font-medium text-green-600 dark:text-green-400 underline-offset-2 hover:underline"
+                  >
+                    Online · {mainStats.server}
+                  </button>
+                  <CopySwitchButton server={mainStats.server} />
+                </>
+              ) : (
+                <span className="text-muted-foreground">Offline</span>
+              )}
+            </p>
+              {!mainStats.online && (
+                <p>
+                  <span className="text-muted-foreground">- Last join</span>
+                  <span className="ml-2">
+                    {mainStats.lastJoin
+                      ? formatTimeElapsed(mainStats.lastJoin)
+                      : "—"}
+                  </span>
+                </p>
+              )}</CardDescription>
+          </CardHeader>
+        </Card>
+        <div className="flex gap-2 w-full">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle className="font-sans">Playtime</CardTitle>
+              <CardDescription className="flex gap-2 text-sm font-mono">
+                {formatPlaytime(mainStats.playtime)}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle className="font-sans">First join</CardTitle>
+              <CardDescription className="flex gap-2 text-sm font-mono">
+                {mainStats.firstJoin ? formatDateDDMonthYear(mainStats.firstJoin) : "—"}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+
+      </div>
+
+
+      {/* <Card>
         <CardHeader>
           <CardTitle>Guild</CardTitle>
           <CardDescription>
@@ -166,14 +173,14 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
             <span className="text-muted-foreground">Total levels</span>{" "}
             {formatNumber(
               mainStats.globalData.totalLevel ??
-                mainStats.globalData.totalLevels
+              mainStats.globalData.totalLevels
             )}
           </p>
           <p>
             <span className="text-muted-foreground">Mobs killed</span>{" "}
             {formatNumber(
               mainStats.globalData.mobsKilled ??
-                mainStats.globalData.killedMobs
+              mainStats.globalData.killedMobs
             )}
           </p>
           <p>
@@ -228,9 +235,9 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
             {formatNumber(mainStats.globalData.pvp?.deaths ?? 0)} D
           </p>
         </CardContent>
-      </Card>
+      </Card> */}
 
-      {mainStats.ranking && Object.keys(mainStats.ranking).length > 0 && (
+      {/* {mainStats.ranking && Object.keys(mainStats.ranking).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Ranking</CardTitle>
@@ -240,9 +247,13 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
             <ul className="space-y-1 text-sm">
               {Object.entries(mainStats.ranking)
                 .sort(([, a], [, b]) => a - b)
-                .slice(0, 15)
                 .map(([name, pos]) => (
                   <li key={name}>
+                    <img
+                      src={`https://cdn.wynncraft.com/nextgen/leaderboard/icons/${name.replace(/([A-Z])/g, " $1").split(" ")[0]}.webp`}
+                      alt={name.replace(/([A-Z])/g, " $1").split(" ")[0]}
+                      className="h-5 w-auto inline-block align-middle capitalize"
+                    />
                     <span className="text-muted-foreground capitalize">
                       {name.replace(/([A-Z])/g, " $1").trim()}
                     </span>{" "}
@@ -257,7 +268,15 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
             </ul>
           </CardContent>
         </Card>
-      )}
+      )} */}
+      <OnlinePlayersDialog
+        open={onlineDialogOpen}
+        onOpenChange={(open) => {
+          setOnlineDialogOpen(open);
+          if (!open) setOnlineDialogServer(null);
+        }}
+        server={onlineDialogServer}
+      />
     </>
   );
 }
@@ -293,51 +312,6 @@ function CharacterFullCard({ char }: { char: PlayerCharacterData }) {
             {formatPlaytime(char.playtime)}
           </p>
         )}
-        {char.mobsKilled != null && (
-          <p>
-            <span className="text-muted-foreground">Mobs killed</span>{" "}
-            {formatNumber(char.mobsKilled)}
-          </p>
-        )}
-        {char.blocksWalked != null && (
-          <p>
-            <span className="text-muted-foreground">Blocks walked</span>{" "}
-            {formatNumber(char.blocksWalked)}
-          </p>
-        )}
-        {char.chestsFound != null && (
-          <p>
-            <span className="text-muted-foreground">Chests found</span>{" "}
-            {formatNumber(char.chestsFound)}
-          </p>
-        )}
-        {char.logins != null && (
-          <p>
-            <span className="text-muted-foreground">Logins</span>{" "}
-            {char.logins} · <span className="text-muted-foreground">Deaths</span>{" "}
-            {char.deaths ?? "—"}
-          </p>
-        )}
-        {char.discoveries != null && (
-          <p>
-            <span className="text-muted-foreground">Discoveries</span>{" "}
-            {char.discoveries}
-          </p>
-        )}
-        {char.contentCompletion != null && (
-          <p>
-            <span className="text-muted-foreground">Content completion</span>{" "}
-            {char.contentCompletion}
-          </p>
-        )}
-        {(char.worldEvents != null || char.lootruns != null || char.caves != null) && (
-          <p>
-            <span className="text-muted-foreground">Events</span>{" "}
-            {[char.worldEvents != null && `World ${char.worldEvents}`, char.lootruns != null && `Loot runs ${char.lootruns}`, char.caves != null && `Caves ${char.caves}`]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        )}
         {hasSkills && char.skillPoints && (
           <p>
             <span className="text-muted-foreground">Skills</span>{" "}
@@ -356,8 +330,24 @@ function CharacterFullCard({ char }: { char: PlayerCharacterData }) {
           <p>
             <span className="text-muted-foreground">Professions</span>{" "}
             {Object.entries(char.professions)
-              .map(([name, p]) => `${name} ${p.level}${p.xpPercent != null ? ` (${p.xpPercent}%)` : ""}`)
-              .join(" · ")}
+              .map(([name, p]) => (
+                <span key={name} className="inline-flex items-center mr-2">
+                  <img
+                    src={`https://cdn.wynncraft.com/nextgen/leaderboard/icons/${name}.webp`}
+                    alt={name}
+                    className="inline-block h-5 w-5 mr-1 align-middle"
+                  />
+                  {name} {p.level}
+                  {p.xpPercent != null ? ` (${p.xpPercent}%)` : ""}
+                </span>
+              ))
+              .reduce(
+                (prev, curr) =>
+                  prev === null
+                    ? [curr]
+                    : [...prev, <span key={Math.random()}> · </span>, curr],
+                null as React.ReactNode[] | null
+              )}
           </p>
         )}
         {char.dungeons && char.dungeons.total != null && (
@@ -394,20 +384,118 @@ function CharacterFullCard({ char }: { char: PlayerCharacterData }) {
   );
 }
 
-export function PlayerFullStatsContent({ fullStats }: { fullStats: PlayerFullStats }) {
+const CLASS_ICON_BASE =
+  "https://cdn.wynncraft.com/nextgen/classes/icons/artboards";
+
+function CharacterCard({
+  char,
+  onClick,
+}: {
+  char: PlayerCharacterData;
+  onClick: () => void;
+}) {
   return (
-    <div className="space-y-6 overflow-y-auto pb-6">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <MainStatsCards mainStats={fullStats} />
-      </div>
-      <div>
-        <h3 className="mb-3 font-semibold">Characters (full data)</h3>
-        <div className="space-y-4">
-          {Object.entries(fullStats.characters).map(([uuid, char]) => (
-            <CharacterFullCard key={uuid} char={char} />
-          ))}
+    <Card
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="group cursor-pointer overflow-hidden border-border/80 bg-card/50 shadow-sm transition-all duration-200 hover:border-primary/30 hover:bg-card hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <div className="p-4 pb-0">
+        <div className="relative mx-auto aspect-square w-full max-w-[200px] p-4 overflow-hidden rounded-xl bg-muted/20 ring-1 ring-border/50 transition-all duration-200 group-hover:ring-primary/40">
+          <img
+            src={`${CLASS_ICON_BASE}/${char.type.toLowerCase()}.webp`}
+            alt={char.type}
+            className="size-full object-contain object-center transition-transform duration-200 group-hover:scale-105"
+          />
         </div>
       </div>
+      <CardContent className="flex flex-col items-center gap-2 p-4 pt-3 text-center">
+        <span
+          className="font-semibold tracking-tight truncate w-full"
+          title={char.type}
+        >
+          {char.type}
+        </span>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            Lv {char.level}
+          </span>
+          {char.playtime != null && (
+            <span className="text-xs text-muted-foreground">
+              {formatPlaytime(char.playtime)}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function PlayerFullStatsContent({ fullStats }: { fullStats: PlayerFullStats }) {
+  const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const characterEntries = Object.entries(fullStats.characters ?? {});
+  const selectedChar = selectedUuid ? fullStats.characters[selectedUuid] : null;
+
+  return (
+    <div className="w-full">
+      {/* Overview panel */}
+      <section className="rounded-xl border border-border/80 bg-card/50 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <MainStatsCards mainStats={fullStats} />
+        </div>
+      </section>
+
+      {/* Classes panel */}
+      {characterEntries.length > 0 && (
+        <section className="mt-8 rounded-xl border border-border/80 bg-card/50 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+          <div className="mb-4 flex items-center gap-3 border-b border-border/60 pb-3">
+            <div className="h-8 w-1 rounded-full bg-primary/70" />
+            <div>
+              <h3 className="font-sans">Classes</h3>
+              <p className="text-xs text-muted-foreground font-mono">
+                {characterEntries.length} character{characterEntries.length === 1 ? "" : "s"} · click to view details
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {characterEntries.map(([uuid, char]) => (
+              <CharacterCard
+                key={uuid}
+                char={char}
+                onClick={() => setSelectedUuid(uuid)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <Dialog open={!!selectedUuid} onOpenChange={(open) => !open && setSelectedUuid(null)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden flex flex-col border-2 border-border/80 shadow-xl">
+          <DialogHeader className="space-y-1 border-b border-border/60 pb-4">
+            <DialogTitle className="text-lg">
+              {selectedChar ? `${selectedChar.type} · ${selectedChar.nickname}` : "Character"}
+            </DialogTitle>
+            {selectedChar && (
+              <p className="text-sm text-muted-foreground">
+                Lv {selectedChar.level}
+                {selectedChar.playtime != null && ` · ${formatPlaytime(selectedChar.playtime)} playtime`}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 min-h-0 -mx-6 px-6 pt-4">
+            {selectedChar && (
+              <CharacterFullCard char={selectedChar} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -18,6 +18,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PlayerFullStatsContent } from "@/components/player-full-stats";
+import { PlayerSkin } from "@/components/player-skin";
+import { rankBadgeUrl } from "@/lib/utils";
+import { FEATURED_USERNAMES } from "@/data/featured-users";
 import type {
   PlayerMainStats,
   PlayerMainStatsResponse,
@@ -26,26 +29,6 @@ import type {
 } from "@/types/player";
 
 const FIXED_LOCALE = "en-US";
-const WYNN_API_BASE =
-  process.env.NEXT_PUBLIC_WYNN_API_BASE ?? "https://cdn.wynncraft.com";
-const MCVIEW3D_EMBED_BASE =
-  process.env.NEXT_PUBLIC_MCVIEW3D_EMBED_BASE ??
-  "https://kurojs.github.io/McView3D/embed.html";
-
-const FEATURED_USERNAMES = ["itspeachqwq", "itsarthurr", "9parinz"] as const;
-
-function rankBadgeUrl(path: string): string {
-  const clean = path.startsWith("/") ? path.slice(1) : path;
-  return `${WYNN_API_BASE}/${clean}`;
-}
-
-function formatPlaytime(hours: number): string {
-  if (hours < 1) return `${Math.round(hours * 60)}m`;
-  if (hours < 24) return `${hours.toFixed(1)}h`;
-  const days = hours / 24;
-  if (days < 30) return `${days.toFixed(1)}d`;
-  return `${(days / 30).toFixed(1)}mo`;
-}
 
 function isMainStats(
   data: PlayerMainStatsResponse
@@ -55,19 +38,6 @@ function isMainStats(
     typeof data === "object" &&
     "username" in data &&
     typeof (data as PlayerMainStats).username === "string"
-  );
-}
-
-function PlayerSkin({ username }: { username: string }) {
-  const src = `${MCVIEW3D_EMBED_BASE}?skin=${encodeURIComponent(username)}&width=400&height=400&animation=idle&cape=default`;
-  return (
-    <iframe
-      src={src}
-      width={400}
-      height={400}
-      title={`${username} skin`}
-      className="border-0 rounded-lg w-full max-w-[400px]"
-    />
   );
 }
 
@@ -87,17 +57,12 @@ function FeaturedPlayerSection({
   onOnlineBadgeClick?: (server: string) => void;
 }) {
   return (
+    <div className="relative group">
+      <div className="absolute top-0 right-0 z-10 w-full h-full " onClick={() => onCardClick(username)} />
     <Card
-      className="cursor-pointer transition-colors hover:bg-muted/50"
-      onClick={() => onCardClick(username)}
+        className="cursor-pointer transition-colors group-hover:bg-muted/50 group-hover:border-green-500/60"
       role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onCardClick(username);
-        }
-      }}
+        tabIndex={0}
     >
       <CardContent className="pt-6">
         <div className="space-y-4">
@@ -131,10 +96,12 @@ function FeaturedPlayerSection({
                   variant="outline"
                   role={mainStats.online ? "button" : undefined}
                   tabIndex={mainStats.online ? 0 : undefined}
-                  className={
-                    mainStats.online
+                    className={`
+                    ${mainStats.online
                       ? "cursor-pointer border-green-500/60 text-green-600 dark:text-green-400 hover:bg-green-500/10"
-                      : "border-red-500/60 text-red-600 dark:text-red-400"
+                      : "border-red-500/60 text-red-600 dark:text-red-400"}
+                      z-20
+                      `
                   }
                   onClick={
                     mainStats.online && mainStats.server && onOnlineBadgeClick
@@ -174,6 +141,8 @@ function FeaturedPlayerSection({
         </div>
       </CardContent>
     </Card>
+    </div>
+
   );
 }
 
@@ -315,7 +284,7 @@ export default function MainPage() {
       </main>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden flex flex-col">
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-6xl flex flex-col !max-w-6xl sm:!max-w-6xl">
           <DialogHeader>
             <DialogTitle>
               Full stats{dialogUsername ? ` · ${dialogUsername}` : ""}
@@ -341,7 +310,7 @@ export default function MainPage() {
         open={onlineDialogOpen}
         onOpenChange={(open) => !open && closeOnlineDialog()}
       >
-        <DialogContent className="max-h-[85vh] max-w-md overflow-hidden flex flex-col">
+        <DialogContent className="max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               Players on {onlineDialogServer ?? "…"}
