@@ -41,14 +41,14 @@ function FeaturedPlayerSection({
 }) {
 	return (
 		<div className="hover:cursor-pointer relative group w-full mx-auto z-10">
-			<div
-				className="absolute top-0 right-0 z-10 w-full h-full "
-				onClick={() => onCardClick(username)}
-			/>
 			<Card
 				className=" transition-colors w-full bg-muted/70 backdrop-blur-sm group-hover:bg-muted/50 group-hover:border-emerald-400/60"
 				role="button"
 				tabIndex={0}
+				onClick={(e) => {
+					e.stopPropagation();
+					onCardClick(username);
+				}}
 			>
 				<CardContent className="pt-6">
 					<div className="space-y-4">
@@ -65,8 +65,15 @@ function FeaturedPlayerSection({
 						</p>
 
 						<div className="flex flex-col gap-4">
-							<div className="flex justify-center overflow-hidden">
+							<div className="relative flex justify-center overflow-hidden">
 								<PlayerSkin username={username} />
+								<div
+									className="absolute top-0 right-0 z-10 w-full h-full "
+									onClick={(e) => {
+										e.stopPropagation();
+										onCardClick(username);
+									}}
+								/>
 							</div>
 
 							{!loading && !error && mainStats && (
@@ -81,7 +88,7 @@ function FeaturedPlayerSection({
 												? "cursor-pointer border-green-500/60 text-green-600 dark:text-green-400 hover:bg-green-500/10"
 												: "border-red-500/60 text-red-600 dark:text-red-400"
 										}
-                      z-20 font-mono
+                      z-50 font-mono
                       `}
 										onClick={
 											mainStats.online && mainStats.server && onOnlineBadgeClick
