@@ -216,7 +216,7 @@ export default function MainPage() {
         <h2 className="mb-6 text-center text-6xl lg:text-9xl font-pixel-circle">
           <span className="text-emerald-400">Wynn</span> Project
         </h2>
-        <div className="grid w-full max-w-7xl grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid w-full mx-auto grid-cols-1 sm:grid-cols-2 gap-4 xl:grid-cols-4">
           {FEATURED_USERNAMES.map((username) => (
             <FeaturedPlayerSection
               key={username}
