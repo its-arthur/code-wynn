@@ -242,6 +242,17 @@ export default function MainPage() {
 						/>
 					</div>
 					<BlobDecoration
+						greenSize={300}
+						yellowSize={400}
+						greenOpacity={0.4}
+						yellowOpacity={0.4}
+						greenOffsetX={100}
+						greenOffsetY={150}
+						yellowOffsetX={-50}
+						yellowOffsetY={-150}
+						swapPositions={true}
+					/>
+					<BlobDecoration
 						greenSize={400}
 						yellowSize={500}
 						greenOpacity={0.2}
