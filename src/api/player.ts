@@ -32,10 +32,15 @@ function isMultiSelector(
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const apiKey = process.env.NEXT_PUBLIC_WYNN_API_KEY;
   const res = await fetch(url, {
-    ...init,
-    headers: { Accept: "application/json", ...init?.headers },
-  });
+		...init,
+		headers: {
+			Accept: "application/json",
+			...(apiKey && { Authorization: `Bearer ${apiKey}` }),
+			...init?.headers,
+		},
+	});
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Wynncraft API ${res.status}: ${text || res.statusText}`);

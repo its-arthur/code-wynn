@@ -10,9 +10,14 @@ import type { OnlinePlayerList } from "@/types/player";
 const BASE = "https://api.wynncraft.com/v3/player";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const apiKey = process.env.NEXT_PUBLIC_WYNN_API_KEY;
   const res = await fetch(url, {
     ...init,
-    headers: { Accept: "application/json", ...init?.headers },
+    headers: {
+      Accept: "application/json",
+      ...(apiKey && { Authorization: `Bearer ${apiKey}` }),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const text = await res.text();
