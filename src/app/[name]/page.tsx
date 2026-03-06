@@ -6,7 +6,9 @@ import { getPlayerFullStats } from "@/api/player";
 import { PlayerFullStatsContent } from "@/components/player-full-stats";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatDateDDMonthYear, formatTimeElapsed } from "@/lib/utils";
 import type { PlayerFullStats } from "@/types/player";
+import { RefreshCw } from "lucide-react";
 
 export default function PlayerNamePage({
 	params,
@@ -18,7 +20,7 @@ export default function PlayerNamePage({
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	useEffect(() => {
+	const fetchPlayer = () => {
 		setLoading(true);
 		setError(null);
 		getPlayerFullStats(name)
@@ -31,15 +33,33 @@ export default function PlayerNamePage({
 				setError(e instanceof Error ? e.message : "Failed to load player");
 			})
 			.finally(() => setLoading(false));
+	};
+
+	useEffect(() => {
+		fetchPlayer();
 	}, [name]);
 
 	return (
 		<div className="min-h-screen bg-background">
 			<main className="container mx-auto max-w-7xl px-4 py-8">
-				<div className="mb-6">
-					<Button variant="ghost" asChild>
+				<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+					<Button variant="outline" asChild>
 						<Link href="/">← Back</Link>
 					</Button>
+					<div className="flex items-center gap-3">
+						<Button
+							variant="outline"
+							size="icon"
+							onClick={() => fetchPlayer()}
+							disabled={loading}
+							title="Refresh"
+							aria-label="Refresh"
+						>
+							<RefreshCw
+								className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+							/>
+						</Button>
+					</div>
 				</div>
 
 				{loading && (

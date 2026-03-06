@@ -13,6 +13,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
 	formatDateDDMonthYear,
 	formatTimeElapsed,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/utils";
 import { wynnClassIconUrl } from "@/lib/wynn-cdn";
 import { PlayerSkin } from "@/components/player-skin";
+import { RotateCcw, RotateCw } from "lucide-react";
 import type {
 	PlayerMainStats,
 	PlayerFullStats,
@@ -54,6 +56,7 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
 	const [onlineDialogServer, setOnlineDialogServer] = useState<string | null>(
 		null,
 	);
+	const [skinKey, setSkinKey] = useState(0);
 
 	const openOnlineDialog = (server: string) => {
 		setOnlineDialogServer(server);
@@ -83,16 +86,31 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
 						</span>
 					</p>
 
-					<div className="flex justify-center">
-						<PlayerSkin username={mainStats.username} />
+					<div className="relative flex flex-col items-center gap-2">
+						<div className=" flex justify-center">
+							<PlayerSkin key={skinKey} username={mainStats.username} />
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							className="gap-1.5 font-mono text-xs absolute bottom-0 right-0"
+							onClick={() => setSkinKey((k) => k + 1)}
+						>
+							<RotateCcw className="h-3.5 w-3.5" />
+						</Button>
 					</div>
 				</CardContent>
 			</Card>
 
 			<div className="space-y-4">
-				<div className="flex flex-col gap-1 ">
-					<p className="text-2xl font-sans">Overview</p>
-					<p className="font-mono text-muted-foreground">Account & status</p>
+				<div className="mb-4 flex items-center gap-3 border-b border-border/60 pb-3">
+					<div className="h-8 w-1 rounded-full bg-primary/70" />
+					<div>
+						<h3 className="font-sans">Overview</h3>
+						<p className="text-xs text-muted-foreground font-mono">
+							Account & status
+						</p>
+					</div>
 				</div>
 				<Card>
 					<CardHeader>
@@ -105,7 +123,7 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
 										<button
 											type="button"
 											onClick={() => openOnlineDialog(mainStats.server!)}
-											className="font-medium text-green-600 dark:text-green-400 underline-offset-2 hover:underline"
+											className="font-medium hover:cursor-pointer text-green-600 dark:text-green-400 underline-offset-2 hover:underline"
 										>
 											Online · {mainStats.server}
 										</button>

@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ArticleDetailView } from "@/components/article-detail";
+import { Separator } from "@/components/ui/separator";
 import {
 	Pagination,
 	PaginationContent,
@@ -74,10 +75,12 @@ export function ArticlesSection() {
 	}, [articleType, articlePage]);
 
 	return (
-		<section className="mt-16 w-full max-w-7xl">
+		<section className=" w-full max-w-7xl">
 			<h2 className="mb-6 text-center text-6xl lg:text-9xl font-pixel-circle">
 				Articles
 			</h2>
+
+			<Separator className="my-6 max-w-4xl mx-auto" />
 
 			<div className="mb-6 flex flex-wrap justify-center gap-2">
 				{(["article", "blog", "giveaway", "event"] as ArticleType[]).map(

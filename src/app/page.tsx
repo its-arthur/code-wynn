@@ -11,6 +11,9 @@ import { rankBadgeUrl } from "@/lib/utils";
 import { FEATURED_USERNAMES } from "@/data/featured-users";
 import type { PlayerMainStats, PlayerMainStatsResponse } from "@/types/player";
 import { ArticlesSection } from "@/components/articles-section";
+import { DotGridDecoration } from "@/components/dot-grid-decoration";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 
 function isMainStats(data: PlayerMainStatsResponse): data is PlayerMainStats {
 	return (
@@ -37,13 +40,13 @@ function FeaturedPlayerSection({
 	onOnlineBadgeClick?: (server: string) => void;
 }) {
 	return (
-		<div className="hover:cursor-pointer relative group w-full mx-auto">
+		<div className="hover:cursor-pointer relative group w-full mx-auto z-10">
 			<div
 				className="absolute top-0 right-0 z-10 w-full h-full "
 				onClick={() => onCardClick(username)}
 			/>
 			<Card
-				className=" transition-colors w-full group-hover:bg-muted/50 group-hover:border-green-500/60"
+				className=" transition-colors w-full bg-muted/70 backdrop-blur-sm group-hover:bg-muted/50 group-hover:border-emerald-400/60"
 				role="button"
 				tabIndex={0}
 			>
@@ -119,11 +122,10 @@ function FeaturedPlayerSection({
 				</CardContent>
 			</Card>
 			<p
-				className="flex flex-col items-center gap-1 text-center font-sans text-sm text-muted-foreground mt-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+				className="flex flex-col items-center text-center font-sans text-sm text-muted-foreground mt-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
 				aria-hidden
 			>
-				<span className="h-1.5 w-8 rounded-full bg-muted-foreground/50" />
-				Click to view detail
+				<span className="h-1.5 w-8 rounded-full bg-emerald-400/50" />
 			</p>
 		</div>
 	);
@@ -170,56 +172,57 @@ export default function MainPage() {
 
 	const REFETCH_MS = 2 * 60 * 1000; // 2 min
 
-	useEffect(() => {
-		const fetchAll = () => {
-			FEATURED_USERNAMES.forEach((username) => {
-				getPlayerMainStats(username)
-					.then((res) => {
-						if (isMainStats(res)) {
-							setData((prev) => ({
-								...prev,
-								[username]: {
-									mainStats: res,
-									loading: false,
-									error: null,
-								},
-							}));
-						} else {
-							setData((prev) => ({
-								...prev,
-								[username]: {
-									mainStats: null,
-									loading: false,
-									error: "Multiple players match; use UUID",
-								},
-							}));
-						}
-					})
-					.catch((e) => {
+	const fetchAll = useCallback(() => {
+		FEATURED_USERNAMES.forEach((username) => {
+			getPlayerMainStats(username)
+				.then((res) => {
+					if (isMainStats(res)) {
+						setData((prev) => ({
+							...prev,
+							[username]: {
+								mainStats: res,
+								loading: false,
+								error: null,
+							},
+						}));
+					} else {
 						setData((prev) => ({
 							...prev,
 							[username]: {
 								mainStats: null,
 								loading: false,
-								error: e instanceof Error ? e.message : "Failed to load",
+								error: "Multiple players match; use UUID",
 							},
 						}));
-					});
-			});
-		};
+					}
+				})
+				.catch((e) => {
+					setData((prev) => ({
+						...prev,
+						[username]: {
+							mainStats: null,
+							loading: false,
+							error: e instanceof Error ? e.message : "Failed to load",
+						},
+					}));
+				});
+		});
+	}, []);
 
+	useEffect(() => {
 		fetchAll();
 		const interval = setInterval(fetchAll, REFETCH_MS);
 		return () => clearInterval(interval);
-	}, []);
+	}, [fetchAll]);
+
+	const anyLoading = FEATURED_USERNAMES.some((u) => data[u]?.loading === true);
 
 	return (
 		<div className="min-h-screen bg-background py-8 px-4">
-			<main className="flex min-h-screen flex-col gap-4 items-center justify-center ">
-				<h2 className="mb-6 text-center text-6xl lg:text-9xl font-pixel-circle">
-					<span className="text-emerald-400">Wynn</span> Project
-				</h2>
-				<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full max-w-7xl mx-auto">
+			<main className="relative flex min-h-screen flex-col gap-4 items-center justify-center">
+				<DotGridDecoration dotOpacity={0.12} dotSpacing={28} showCorners />
+
+				<div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full max-w-7xl mx-auto">
 					{FEATURED_USERNAMES.map((username) => (
 						<FeaturedPlayerSection
 							key={username}
@@ -231,8 +234,42 @@ export default function MainPage() {
 							onOnlineBadgeClick={openOnlineListDialog}
 						/>
 					))}
+					<div className="absolute inset-0 z-0 flex items-center justify-center">
+						<img
+							src="https://cdn.wynncraft.com/nextgen/wynncraft_icon.png"
+							alt="Wynncraft"
+							className="h-96 w-96 shrink-0 object-contain sm:h-96 sm:w-96"
+						/>
+					</div>
 				</div>
+
+				<Button
+					variant="outline"
+					className="absolute top-4 right-4 z-10"
+					size="icon"
+					onClick={() => {
+						FEATURED_USERNAMES.forEach((username) => {
+							setData((prev) => ({
+								...prev,
+								[username]: {
+									mainStats: prev[username]?.mainStats ?? null,
+									loading: true,
+									error: null,
+								},
+							}));
+						});
+						fetchAll();
+					}}
+					disabled={anyLoading}
+					title="Refresh"
+					aria-label="Refresh"
+				>
+					<RefreshCw
+						className={`h-4 w-4 ${anyLoading ? "animate-spin" : ""}`}
+					/>
+				</Button>
 			</main>
+
 			<div className="w-full max-w-7xl mx-auto">
 				<ArticlesSection />
 			</div>
