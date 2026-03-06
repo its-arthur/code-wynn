@@ -19,6 +19,15 @@ export function wynnNextgenUrl(...pathSegments: (string | number)[]): string {
   return path ? `${WYNN_NEXTGEN_BASE}/${path}` : WYNN_NEXTGEN_BASE;
 }
 
+/**
+ * Build a full nextgen CDN URL from a raw path string (leading slash optional).
+ * Use when the API already returns a path segment rather than individual parts.
+ * @example wynnNextgenPath("articles/banners/foo.webp")
+ */
+export function wynnNextgenPath(path: string): string {
+  return wynnNextgenUrl(path);
+}
+
 /** Class icon (artboards) e.g. mage.webp, warrior.webp */
 export function wynnClassIconUrl(className: string, ext: "webp" | "png" = "webp"): string {
   return wynnNextgenUrl("classes", "icons", "artboards", `${className.toLowerCase()}.${ext}`);
