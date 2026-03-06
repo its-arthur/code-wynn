@@ -5,53 +5,55 @@
  */
 
 import type {
-  PlayerMainStats,
-  PlayerMainStatsResponse,
-  PlayerFullStats,
-  PlayerCharacterListItem,
-  PlayerCharacterData,
-  PlayerCharacterAbilityMap,
-  PlayerWhoami,
-  OnlinePlayerList,
+	PlayerMainStats,
+	PlayerMainStatsResponse,
+	PlayerFullStats,
+	PlayerCharacterListItem,
+	PlayerCharacterData,
+	PlayerCharacterAbilityMap,
+	PlayerWhoami,
+	OnlinePlayerList,
 } from "@/types/player";
 
 /** Use same-origin proxy in browser to avoid CORS; call Wynncraft directly on server. */
 const BASE =
-  typeof window !== "undefined"
-    ? "/api/wynn/player"
-    : "https://api.wynncraft.com/v3/player";
+	typeof window !== "undefined"
+		? "/api/wynn/player"
+		: "https://api.wynncraft.com/v3/player";
 
 function isMultiSelector(
-  data: PlayerMainStatsResponse
+	data: PlayerMainStatsResponse,
 ): data is Record<string, { storedName: string; rank: string }> {
-  if (!data || typeof data !== "object") return false;
-  const first = Object.values(data)[0];
-  return (
-    first != null &&
-    typeof first === "object" &&
-    "storedName" in first &&
-    "rank" in first &&
-    !("username" in first)
-  );
+	if (!data || typeof data !== "object") return false;
+	const first = Object.values(data)[0];
+	return (
+		first != null &&
+		typeof first === "object" &&
+		"storedName" in first &&
+		"rank" in first &&
+		!("username" in first)
+	);
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const apiKey = process.env.WYNN_API_KEY ?? process.env.NEXT_PUBLIC_WYNN_API_KEY;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(apiKey && url.startsWith("http") && {
-        Authorization: `Bearer ${apiKey}`,
-      }),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Wynncraft API ${res.status}: ${text || res.statusText}`);
-  }
-  return res.json() as Promise<T>;
+	const apiKey =
+		process.env.WYNN_API_KEY ?? process.env.NEXT_PUBLIC_WYNN_API_KEY;
+	const res = await fetch(url, {
+		...init,
+		headers: {
+			Accept: "application/json",
+			...(apiKey &&
+				url.startsWith("http") && {
+					Authorization: `Bearer ${apiKey}`,
+				}),
+			...init?.headers,
+		},
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`Wynncraft API ${res.status}: ${text || res.statusText}`);
+	}
+	return res.json() as Promise<T>;
 }
 
 /**
@@ -59,10 +61,10 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
  * @param identifier - username or UUID
  */
 export async function getPlayerMainStats(
-  identifier: string
+	identifier: string,
 ): Promise<PlayerMainStatsResponse> {
-  const url = `${BASE}/${encodeURIComponent(identifier)}`;
-  return fetchJson<PlayerMainStatsResponse>(url);
+	const url = `${BASE}/${encodeURIComponent(identifier)}`;
+	return fetchJson<PlayerMainStatsResponse>(url);
 }
 
 /**
@@ -70,10 +72,10 @@ export async function getPlayerMainStats(
  * @param identifier - username or UUID
  */
 export async function getPlayerFullStats(
-  identifier: string
+	identifier: string,
 ): Promise<PlayerFullStats> {
-  const url = `${BASE}/${encodeURIComponent(identifier)}?fullResult`;
-  return fetchJson<PlayerFullStats>(url);
+	const url = `${BASE}/${encodeURIComponent(identifier)}?fullResult`;
+	return fetchJson<PlayerFullStats>(url);
 }
 
 /**
@@ -81,10 +83,10 @@ export async function getPlayerFullStats(
  * @param identifier - username or UUID
  */
 export async function getPlayerCharacterList(
-  identifier: string
+	identifier: string,
 ): Promise<Record<string, PlayerCharacterListItem>> {
-  const url = `${BASE}/${encodeURIComponent(identifier)}/characters`;
-  return fetchJson<Record<string, PlayerCharacterListItem>>(url);
+	const url = `${BASE}/${encodeURIComponent(identifier)}/characters`;
+	return fetchJson<Record<string, PlayerCharacterListItem>>(url);
 }
 
 /**
@@ -93,11 +95,11 @@ export async function getPlayerCharacterList(
  * @param characterUuid - character UUID
  */
 export async function getPlayerCharacterData(
-  identifier: string,
-  characterUuid: string
+	identifier: string,
+	characterUuid: string,
 ): Promise<PlayerCharacterData> {
-  const url = `${BASE}/${encodeURIComponent(identifier)}/characters/${encodeURIComponent(characterUuid)}`;
-  return fetchJson<PlayerCharacterData>(url);
+	const url = `${BASE}/${encodeURIComponent(identifier)}/characters/${encodeURIComponent(characterUuid)}`;
+	return fetchJson<PlayerCharacterData>(url);
 }
 
 /**
@@ -107,11 +109,11 @@ export async function getPlayerCharacterData(
  * @param characterUuid - character UUID
  */
 export async function getPlayerCharacterAbilityMap(
-  identifier: string,
-  characterUuid: string
+	identifier: string,
+	characterUuid: string,
 ): Promise<PlayerCharacterAbilityMap> {
-  const url = `${BASE}/${encodeURIComponent(identifier)}/characters/${encodeURIComponent(characterUuid)}/abilities`;
-  return fetchJson<PlayerCharacterAbilityMap>(url);
+	const url = `${BASE}/${encodeURIComponent(identifier)}/characters/${encodeURIComponent(characterUuid)}/abilities`;
+	return fetchJson<PlayerCharacterAbilityMap>(url);
 }
 
 /**
@@ -119,8 +121,8 @@ export async function getPlayerCharacterAbilityMap(
  * Returns accounts that have joined Wynncraft.
  */
 export async function getPlayerWhoami(): Promise<PlayerWhoami> {
-  const url = `${BASE}/whoami`;
-  return fetchJson<PlayerWhoami>(url);
+	const url = `${BASE}/whoami`;
+	return fetchJson<PlayerWhoami>(url);
 }
 
 /**
@@ -128,17 +130,17 @@ export async function getPlayerWhoami(): Promise<PlayerWhoami> {
  * Path may be /v3/network/onlinePlayers depending on API version.
  */
 export async function getOnlinePlayerList(): Promise<OnlinePlayerList> {
-  const url = `${BASE}/online`;
-  return fetchJson<OnlinePlayerList>(url);
+	const url = `${BASE}/online`;
+	return fetchJson<OnlinePlayerList>(url);
 }
 
 /** Helper: assert main stats (not multi-selector) */
 export function assertPlayerMainStats(
-  data: PlayerMainStatsResponse
+	data: PlayerMainStatsResponse,
 ): asserts data is PlayerMainStats {
-  if (isMultiSelector(data)) {
-    throw new Error(
-      "Multiple players match this name; use UUID or select one from the multi-selector response."
-    );
-  }
+	if (isMultiSelector(data)) {
+		throw new Error(
+			"Multiple players match this name; use UUID or select one from the multi-selector response.",
+		);
+	}
 }

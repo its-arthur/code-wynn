@@ -8,20 +8,20 @@
  * Content is from our proxy; for user-generated content, sanitize (e.g. DOMPurify) first.
  */
 export function AbilityMarkup({
-  html,
-  className,
-  as: Tag = "span",
+	html,
+	className,
+	as: Tag = "span",
 }: {
-  html: string;
-  className?: string;
-  as?: "span" | "div" | "p";
+	html: string;
+	className?: string;
+	as?: "span" | "div" | "p";
 }) {
-  if (!html?.trim()) return null;
-  return (
-    <Tag
-      className={`wynn-api-markup ${className ?? ""}`.trim()}
-      dangerouslySetInnerHTML={{ __html: html }}
-      suppressHydrationWarning
-    />
-  );
+	if (!html?.trim()) return null;
+	return (
+		<Tag
+			className={`wynn-api-markup ${className ?? ""}`.trim()}
+			dangerouslySetInnerHTML={{ __html: html }}
+			suppressHydrationWarning
+		/>
+	);
 }
