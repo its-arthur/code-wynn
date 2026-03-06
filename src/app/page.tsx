@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { OnlinePlayersDialog } from "@/components/online-players-dialog";
 import { PlayerSkin } from "@/components/player-skin";
-import { rankBadgeUrl } from "@/lib/utils";
 import { FEATURED_USERNAMES } from "@/data/featured-users";
 import type { PlayerMainStats, PlayerMainStatsResponse } from "@/types/player";
 import { ArticlesSection } from "@/components/articles-section";
+import { BlobDecoration } from "@/components/blob-decoration";
 import { DotGridDecoration } from "@/components/dot-grid-decoration";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
@@ -241,6 +241,12 @@ export default function MainPage() {
 							className="h-96 w-96 shrink-0 object-contain sm:h-96 sm:w-96"
 						/>
 					</div>
+					<BlobDecoration
+						greenSize={400}
+						yellowSize={500}
+						greenOpacity={0.2}
+						yellowOpacity={0.2}
+					/>
 				</div>
 
 				<Button
