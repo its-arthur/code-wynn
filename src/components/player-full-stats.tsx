@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getAbilityTree, getAbilityMap } from "@/api/ability";
+import { getPlayerCharacterAbilityMap } from "@/api/player";
+import { CharacterDetailDialog } from "@/components/character-detail-dialog";
 import { CopySwitchButton } from "@/components/copy-switch-button";
 import { OnlinePlayersDialog } from "@/components/online-players-dialog";
 import {
@@ -10,22 +13,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { formatDateDDMonthYear, formatTimeElapsed, rankBadgeUrl } from "@/lib/utils";
+import { wynnClassIconUrl } from "@/lib/wynn-cdn";
 import { PlayerSkin } from "@/components/player-skin";
 import type {
   PlayerMainStats,
   PlayerFullStats,
   PlayerCharacterData,
 } from "@/types/player";
+import type { AbilityTreeResponse, AbilityMapEntry } from "@/types/ability";
 
 const FIXED_LOCALE = "en-US";
+
+function flattenMapEntries(
+  data: AbilityMapEntry[] | Record<string, AbilityMapEntry[]>
+): AbilityMapEntry[] {
+  if (Array.isArray(data)) return data;
+  return Object.values(data).flat();
+}
 
 function formatPlaytime(hours: number): string {
   if (hours < 1) return `${Math.round(hours * 60)}m`;
@@ -250,7 +255,7 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
                 .map(([name, pos]) => (
                   <li key={name}>
                     <img
-                      src={`https://cdn.wynncraft.com/nextgen/leaderboard/icons/${name.replace(/([A-Z])/g, " $1").split(" ")[0]}.webp`}
+                      src={wynnLeaderboardIconUrl(name.replace(/([A-Z])/g, " $1").split(" ")[0])}
                       alt={name.replace(/([A-Z])/g, " $1").split(" ")[0]}
                       className="h-5 w-auto inline-block align-middle capitalize"
                     />
@@ -281,112 +286,6 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
   );
 }
 
-function CharacterFullCard({ char }: { char: PlayerCharacterData }) {
-  const hasSkills =
-    char.skillPoints && Object.keys(char.skillPoints).length > 0;
-  const hasProfessions =
-    char.professions && Object.keys(char.professions).length > 0;
-  const def = char.skillPoints?.defence ?? char.skillPoints?.defense;
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">
-          {char.nickname} · {char.type}
-          {char.reskin != null && char.reskin !== char.type && (
-            <span className="text-muted-foreground font-normal">
-              {" "}
-              (reskin: {char.reskin})
-            </span>
-          )}
-        </CardTitle>
-        <CardDescription>
-          Lv {char.level} (Total {char.totalLevel})
-          {char.xp != null && ` · XP ${formatNumber(char.xp)} (${char.xpPercent ?? 0}%)`}
-          {char.gamemode?.length ? ` · ${char.gamemode.join(", ")}` : ""}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        {char.playtime != null && (
-          <p>
-            <span className="text-muted-foreground">Playtime</span>{" "}
-            {formatPlaytime(char.playtime)}
-          </p>
-        )}
-        {hasSkills && char.skillPoints && (
-          <p>
-            <span className="text-muted-foreground">Skills</span>{" "}
-            {[
-              char.skillPoints.strength != null && `STR ${char.skillPoints.strength}`,
-              char.skillPoints.dexterity != null && `DEX ${char.skillPoints.dexterity}`,
-              char.skillPoints.intelligence != null && `INT ${char.skillPoints.intelligence}`,
-              def != null && `DEF ${def}`,
-              char.skillPoints.agility != null && `AGI ${char.skillPoints.agility}`,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          </p>
-        )}
-        {hasProfessions && char.professions && (
-          <p>
-            <span className="text-muted-foreground">Professions</span>{" "}
-            {Object.entries(char.professions)
-              .map(([name, p]) => (
-                <span key={name} className="inline-flex items-center mr-2">
-                  <img
-                    src={`https://cdn.wynncraft.com/nextgen/leaderboard/icons/${name}.webp`}
-                    alt={name}
-                    className="inline-block h-5 w-5 mr-1 align-middle"
-                  />
-                  {name} {p.level}
-                  {p.xpPercent != null ? ` (${p.xpPercent}%)` : ""}
-                </span>
-              ))
-              .reduce(
-                (prev, curr) =>
-                  prev === null
-                    ? [curr]
-                    : [...prev, <span key={Math.random()}> · </span>, curr],
-                null as React.ReactNode[] | null
-              )}
-          </p>
-        )}
-        {char.dungeons && char.dungeons.total != null && (
-          <p>
-            <span className="text-muted-foreground">Dungeons</span>{" "}
-            {char.dungeons.total}
-            {char.dungeons.list &&
-              Object.keys(char.dungeons.list).length > 0 &&
-              ` (${Object.entries(char.dungeons.list)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(", ")})`}
-          </p>
-        )}
-        {char.raids && char.raids.total != null && (
-          <p>
-            <span className="text-muted-foreground">Raids</span>{" "}
-            {char.raids.total}
-            {char.raids.list &&
-              Object.keys(char.raids.list).length > 0 &&
-              ` (${Object.entries(char.raids.list)
-                .filter(([, v]) => v > 0)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(", ")})`}
-          </p>
-        )}
-        {char.quests && char.quests.length > 0 && (
-          <p>
-            <span className="text-muted-foreground">Quests</span>{" "}
-            {char.quests.length} completed
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-const CLASS_ICON_BASE =
-  "https://cdn.wynncraft.com/nextgen/classes/icons/artboards";
-
 function CharacterCard({
   char,
   onClick,
@@ -410,7 +309,7 @@ function CharacterCard({
       <div className="p-4 pb-0">
         <div className="relative mx-auto aspect-square w-full max-w-[200px] p-4 overflow-hidden rounded-xl bg-muted/20 ring-1 ring-border/50 transition-all duration-200 group-hover:ring-primary/40">
           <img
-            src={`${CLASS_ICON_BASE}/${char.type.toLowerCase()}.webp`}
+            src={wynnClassIconUrl(char.type)}
             alt={char.type}
             className="size-full object-contain object-center transition-transform duration-200 group-hover:scale-105"
           />
@@ -421,7 +320,13 @@ function CharacterCard({
           className="font-semibold tracking-tight truncate w-full"
           title={char.type}
         >
-          {char.type}
+          {char.type} 
+          {" "}
+          {char.reskin != null && char.reskin !== char.type && (
+            <span className="text-muted-foreground font-normal">
+              {char.reskin}
+            </span>
+          )}
         </span>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -442,6 +347,65 @@ export function PlayerFullStatsContent({ fullStats }: { fullStats: PlayerFullSta
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
   const characterEntries = Object.entries(fullStats.characters ?? {});
   const selectedChar = selectedUuid ? fullStats.characters[selectedUuid] : null;
+
+  const [abilityTree, setAbilityTree] = useState<AbilityTreeResponse | null>(null);
+  const [abilityFullMap, setAbilityFullMap] = useState<AbilityMapEntry[] | null>(null);
+  const [abilityPlayerMap, setAbilityPlayerMap] = useState<AbilityMapEntry[] | null>(null);
+  const [abilityLoading, setAbilityLoading] = useState(false);
+  const [abilityError, setAbilityError] = useState<string | null>(null);
+
+  const loadAbilityMap = useCallback(() => {
+    if (!selectedChar || !selectedUuid || !fullStats.username) return;
+    const treeClass = selectedChar.type.toLowerCase();
+    setAbilityLoading(true);
+    setAbilityError(null);
+    Promise.allSettled([
+      getAbilityTree(treeClass),
+      getAbilityMap(treeClass),
+      getPlayerCharacterAbilityMap(fullStats.username, selectedUuid),
+    ])
+      .then(([treeRes, fullMapRes, playerMapRes]) => {
+        setAbilityTree(treeRes.status === "fulfilled" ? treeRes.value : null);
+        setAbilityFullMap(
+          fullMapRes.status === "fulfilled"
+            ? flattenMapEntries(
+              fullMapRes.value as AbilityMapEntry[] | Record<string, AbilityMapEntry[]>
+            )
+            : null
+        );
+        setAbilityPlayerMap(
+          playerMapRes.status === "fulfilled" ? (playerMapRes.value as AbilityMapEntry[]) : null
+        );
+        if (
+          treeRes.status === "rejected" &&
+          fullMapRes.status === "rejected" &&
+          playerMapRes.status === "rejected"
+        ) {
+          setAbilityError(
+            playerMapRes.reason instanceof Error
+              ? playerMapRes.reason.message
+              : "Failed to load ability map"
+          );
+        }
+      })
+      .finally(() => setAbilityLoading(false));
+  }, [selectedChar, selectedUuid, fullStats.username]);
+
+  useEffect(() => {
+    if (!selectedUuid || !selectedChar) {
+      setAbilityTree(null);
+      setAbilityFullMap(null);
+      setAbilityPlayerMap(null);
+      setAbilityError(null);
+      return;
+    }
+    loadAbilityMap();
+  }, [loadAbilityMap, selectedUuid, selectedChar]);
+
+  const abilityEntries = (abilityFullMap && abilityFullMap.length > 0
+    ? abilityFullMap
+    : abilityPlayerMap ?? []) as AbilityMapEntry[];
+  const playerMapEntries = (abilityPlayerMap ?? []) as AbilityMapEntry[];
 
   return (
     <div className="w-full">
@@ -476,26 +440,19 @@ export function PlayerFullStatsContent({ fullStats }: { fullStats: PlayerFullSta
         </section>
       )}
 
-      <Dialog open={!!selectedUuid} onOpenChange={(open) => !open && setSelectedUuid(null)}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden flex flex-col border-2 border-border/80 shadow-xl">
-          <DialogHeader className="space-y-1 border-b border-border/60 pb-4">
-            <DialogTitle className="text-lg">
-              {selectedChar ? `${selectedChar.type} · ${selectedChar.nickname}` : "Character"}
-            </DialogTitle>
-            {selectedChar && (
-              <p className="text-sm text-muted-foreground">
-                Lv {selectedChar.level}
-                {selectedChar.playtime != null && ` · ${formatPlaytime(selectedChar.playtime)} playtime`}
-              </p>
-            )}
-          </DialogHeader>
-          <div className="overflow-y-auto flex-1 min-h-0 -mx-6 px-6 pt-4">
-            {selectedChar && (
-              <CharacterFullCard char={selectedChar} />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CharacterDetailDialog
+        open={!!selectedUuid}
+        onOpenChange={(open) => !open && setSelectedUuid(null)}
+        characterEntries={characterEntries}
+        selectedUuid={selectedUuid}
+        onSelectCharacter={setSelectedUuid}
+        selectedChar={selectedChar}
+        abilityLoading={abilityLoading}
+        abilityError={abilityError}
+        abilityEntries={abilityEntries}
+        abilityTree={abilityTree}
+        playerMapEntries={playerMapEntries}
+      />
     </div>
   );
 }

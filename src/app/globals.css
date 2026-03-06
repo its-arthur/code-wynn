@@ -12,6 +12,70 @@
     format("woff2");
 }
 
+/* Wynncraft API Markup fonts (nextgen/fonts – for ability/tree descriptions) */
+@font-face {
+  font-family: "wynn-ascii";
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+  src: url("https://cdn.wynncraft.com/nextgen/fonts/ascii.woff") format("woff");
+}
+@font-face {
+  font-family: "wynn-common";
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+  src: url("https://cdn.wynncraft.com/nextgen/fonts/common.woff") format("woff");
+}
+@font-face {
+  font-family: "wynn-default";
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+  src: url("https://cdn.wynncraft.com/nextgen/fonts/default.woff") format("woff");
+}
+@font-face {
+  font-family: "wynn-five";
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+  src: url("https://cdn.wynncraft.com/nextgen/fonts/five.woff") format("woff");
+}
+@font-face {
+  font-family: "wynn-wynnic";
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+  src: url("https://cdn.wynncraft.com/nextgen/fonts/wynnic.woff") format("woff");
+}
+@font-face {
+  font-family: "wynn-high_gavelian";
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+  src: url("https://cdn.wynncraft.com/nextgen/fonts/high_gavelian.woff") format("woff");
+}
+
+/* API Markup font classes (span.class from API) */
+.font-ascii {
+  font-family: "wynn-ascii", sans-serif;
+}
+.font-common {
+  font-family: "wynn-common", sans-serif;
+}
+.font-default {
+  font-family: "wynn-default", sans-serif;
+}
+.font-five {
+  font-family: "wynn-five", sans-serif;
+}
+.font-wynnic {
+  font-family: "wynn-wynnic", sans-serif;
+}
+.font-high_gavelian {
+  font-family: "wynn-high_gavelian", sans-serif;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -133,9 +197,15 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Hide all scrollbars (content still scrollable) */
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
   }
   body {
     @apply bg-background text-foreground;

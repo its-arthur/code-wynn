@@ -110,7 +110,7 @@ export async function getPlayerCharacterAbilityMap(
   identifier: string,
   characterUuid: string
 ): Promise<PlayerCharacterAbilityMap> {
-  const url = `${BASE}/${encodeURIComponent(identifier)}/characters/${encodeURIComponent(characterUuid)}/abilitymap`;
+  const url = `${BASE}/${encodeURIComponent(identifier)}/characters/${encodeURIComponent(characterUuid)}/abilities`;
   return fetchJson<PlayerCharacterAbilityMap>(url);
 }
 

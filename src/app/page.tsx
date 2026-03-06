@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getLatestNews } from "@/api/news";
 import { getPlayerMainStats } from "@/api/player";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,6 +17,7 @@ import type {
   PlayerMainStats,
   PlayerMainStatsResponse,
 } from "@/types/player";
+import type { NewsItem } from "@/types/news";
 
 function isMainStats(
   data: PlayerMainStatsResponse
@@ -209,9 +211,20 @@ export default function MainPage() {
     });
   }, []);
 
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [newsError, setNewsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getLatestNews()
+      .then(setNews)
+      .catch((e) => setNewsError(e instanceof Error ? e.message : "Failed to load news"))
+      .finally(() => setNewsLoading(false));
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
-      <main className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
+      <main className="flex min-h-screen flex-col items-center px-4 py-8">
         <div className="grid w-full max-w-7xl grid-cols-1 gap-8 lg:grid-cols-3">
           {FEATURED_USERNAMES.map((username) => (
             <FeaturedPlayerSection
@@ -225,6 +238,46 @@ export default function MainPage() {
             />
           ))}
         </div>
+
+        <section className="mt-16 w-full max-w-7xl">
+          <h2 className="mb-6 text-center text-2xl font-semibold">News</h2>
+          {newsLoading && (
+            <p className="text-center text-sm text-muted-foreground">Loading news…</p>
+          )}
+          {newsError && (
+            <p className="text-center text-sm text-destructive">{newsError}</p>
+          )}
+          {!newsLoading && !newsError && news.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {news.map((item) => (
+                <Card
+                  key={item.forumThread}
+                  className="cursor-pointer transition-colors hover:bg-muted/50 hover:border-primary/40"
+                  onClick={() => window.open(item.forumThread, "_blank", "noopener,noreferrer")}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      window.open(item.forumThread, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold leading-tight">{item.title}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.date.trim()} · {item.author}
+                      {item.comments ? ` · ${item.comments} comments` : ""}
+                    </p>
+                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                      {item.content.replace(/<[^>]*>/g, "").replace(/&#039;/g, "'")}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
 
       <OnlinePlayersDialog
