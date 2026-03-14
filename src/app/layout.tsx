@@ -9,6 +9,7 @@ import {
 } from "geist/font/pixel";
 import { GeistSans } from "geist/font/sans";
 import { DisableZoomHandler } from "@/components/disable-zoom-handler";
+import { Navbar } from "@/components/navbar";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -36,6 +37,7 @@ export default function RootLayout({
 		>
 			<body className="antialiased bg-background text-foreground font-sans select-none touch-manipulation">
 				<DisableZoomHandler />
+				<Navbar />
 				{children}
 				<Toaster position="bottom-right" />
 			</body>

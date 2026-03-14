@@ -1,0 +1,110 @@
+import type { WynnventoryIcon } from "./common";
+
+export interface TradeListing {
+	amount: number;
+	hash_code: number;
+	icon?: WynnventoryIcon | null;
+	item_type: string;
+	listing_price: number;
+	mod_version: string;
+	name: string;
+	rarity: string;
+	shiny_stat: string | null;
+	tier: number | null;
+	timestamp: string;
+	type: string;
+	unidentified: boolean;
+}
+
+export interface TradeListingsResponse {
+	count: number;
+	items: TradeListing[];
+	page: number;
+	page_size: number;
+	total: number;
+}
+
+export interface TradeListingsParams {
+	tier?: number;
+	shiny?: boolean;
+	unidentified?: boolean;
+	rarity?: string;
+	itemType?: string;
+	page?: number;
+	page_size?: number;
+}
+
+export interface TradePriceInfo {
+	_id: null;
+	average_mid_80_percent_price: number;
+	average_price: number;
+	highest_price: number;
+	lowest_price: number;
+	name: string;
+	tier: number | null;
+	total_count: number;
+	unidentified_average_mid_80_percent_price: number;
+	unidentified_average_price: number;
+	unidentified_count: number;
+}
+
+export interface TradePriceParams {
+	shiny?: boolean;
+	tier?: number;
+}
+
+export interface TradeHistoricAverage {
+	average_mid_80_percent_price: number;
+	average_price: number;
+	document_count: number;
+	highest_price: number;
+	lowest_price: number;
+	name: string;
+	tier: number | null;
+	total_count: number;
+	unidentified_average_mid_80_percent_price: number;
+	unidentified_average_price: number;
+	unidentified_count: number;
+}
+
+export interface TradeHistoryParams {
+	shiny?: boolean;
+	tier?: number;
+	start_date?: string;
+	end_date?: string;
+}
+
+export interface TradeHistoricDay {
+	average_mid_80_percent_price: number;
+	average_price: number;
+	date: string;
+	highest_price: number;
+	item_type: string;
+	lowest_price: number;
+	name: string;
+	shiny_stat: string | null;
+	tier: number | null;
+	total_count: number;
+	unidentified_average_mid_80_percent_price: number;
+	unidentified_average_price: number;
+	unidentified_count: number;
+}
+
+export interface TradeRankingEntry {
+	average_mid_80_percent_price: number;
+	average_price: number;
+	average_total_count: number;
+	average_unidentified_count: number;
+	highest_price: number;
+	lowest_price: number;
+	name: string;
+	rank: number;
+	total_count: number;
+	unidentified_average_mid_80_percent_price: number;
+	unidentified_count: number;
+}
+
+export interface TradeRankingParams {
+	start_date?: string;
+	end_date?: string;
+}
