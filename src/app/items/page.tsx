@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Search, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ItemCard } from "@/components/market/item-card";
-import { SearchOverlay } from "@/components/market/search-overlay";
+import { ItemCard } from "@/components/items/item-card";
+import { SearchOverlay } from "@/components/items/search-overlay";
 import { getItemDatabasePaginated } from "@/api/item";
 import type { ItemDatabase, ItemPaginationController } from "@/types/item";
 
-export default function MarketPage() {
+export default function ItemsPage() {
 	const [items, setItems] = useState<ItemDatabase>({});
 	const [controller, setController] = useState<ItemPaginationController | null>(
 		null,

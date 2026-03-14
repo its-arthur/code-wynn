@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Home, Store, Swords, Coins } from "lucide-react";
+import { Home, Package, Swords, Coins, Store } from "lucide-react";
 
 const navItems = [
 	{ href: "/", label: "Home", icon: Home },
-	{ href: "/market", label: "Market", icon: Store },
+	{ href: "/items", label: "Items", icon: Package },
 	{ href: "/raidpool", label: "Raids", icon: Swords },
 	{ href: "/lootpool", label: "Lootpool", icon: Coins },
+	{ href: "/trademarket", label: "Market", icon: Store },
 ] as const;
 
 export function Navbar() {

@@ -11,7 +11,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { ItemCard } from "@/components/market/item-card";
+import { ItemCard } from "@/components/items/item-card";
 import { quickSearchItems, searchItems, getItemMetadata } from "@/api/item";
 import type {
 	ItemDatabase,
@@ -211,9 +211,7 @@ export function SearchOverlay({
 
 						<Select
 							value={filterAttackSpeed}
-							onValueChange={(v) =>
-								setFilterAttackSpeed(v === "all" ? "" : v)
-							}
+							onValueChange={(v) => setFilterAttackSpeed(v === "all" ? "" : v)}
 						>
 							<SelectTrigger className="w-[150px]" size="sm">
 								<SelectValue placeholder="Attack Speed" />
