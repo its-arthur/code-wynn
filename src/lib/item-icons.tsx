@@ -1,5 +1,9 @@
 import { ItemEntry } from "@/types/item";
-import { wynnItemGuideUrl, wynnTomeIconUrl } from "@/lib/wynn-cdn";
+import {
+	wynnItemGuideUrl,
+	wynnTomeIconUrl,
+	wynnAspectIconUrl,
+} from "@/lib/wynn-cdn";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -133,6 +137,20 @@ function getTomeSubtypeFromName(name: string): string | null {
 	return getTomeIconSlug(name);
 }
 
+/** Extract aspect name from string (e.g. "abilityTree.aspectShaman" or "aspectShaman") */
+function getAspectNameFromString(str: string): string | null {
+	const s = (str ?? "").trim();
+	if (!s.toLowerCase().includes("aspect")) return null;
+	// "abilityTree.aspectShaman" → aspectShaman
+	if (s.includes("abilityTree.") || s.includes("abilitytree.")) {
+		const part = s.split(".").pop();
+		return part ?? null;
+	}
+	// "aspectShaman" or "aspectArcher"
+	const match = s.match(/aspect[A-Za-z0-9]+/i);
+	return match ? match[0] : null;
+}
+
 function isKeyItem(name: string, type?: string, subType?: string): boolean {
 	const n = name.toLowerCase();
 	const t = type?.toLowerCase() ?? "";
@@ -159,6 +177,8 @@ function getItemIconUrl(item: ItemEntry | string): string | null {
 		if (emeraldPath) return emeraldPath;
 		const tomeSlug = getTomeSubtypeFromName(item);
 		if (tomeSlug !== null) return wynnTomeIconUrl(tomeSlug);
+		const aspectName = getAspectNameFromString(item);
+		if (aspectName !== null) return wynnAspectIconUrl(aspectName);
 		return wynnItemGuideUrl(item);
 	}
 
@@ -234,6 +254,17 @@ function getItemIconUrl(item: ItemEntry | string): string | null {
 				? (item.icon.value?.id ?? item.icon.value?.name ?? "")
 				: String(item.icon.value);
 		return skinId.trim() ? `${MC_HEADS_BASE}/${skinId}` : null;
+	}
+
+	if (
+		item.icon.format === "aspect" ||
+		item.icon.format?.toLowerCase().includes("aspect")
+	) {
+		const aspectName =
+			typeof item.icon.value === "object"
+				? (item.icon.value?.name ?? "")
+				: String(item.icon.value);
+		return aspectName ? wynnAspectIconUrl(aspectName) : null;
 	}
 
 	if (item.icon.format === "attribute" || item.icon.format === "legacy") {

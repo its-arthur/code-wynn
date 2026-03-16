@@ -83,6 +83,14 @@ export function wynnAbilityConnectorUrl(filename: string): string {
 	return wynnNextgenUrl("abilities", "2.1", "connectors", "grid", filename);
 }
 
+/** Aspect icon e.g. aspectArcher → abilities/2.1/aspects/abilityTree.aspectArcher.png */
+export function wynnAspectIconUrl(aspectName: string): string {
+	const name = (aspectName ?? "").trim().replace(/\.png$/i, "");
+	if (!name) return wynnNextgenUrl("abilities", "2.1", "aspects", "abilityTree.aspectArcher.png");
+	const base = name.startsWith("abilityTree.") ? name : `abilityTree.${name}`;
+	return wynnNextgenUrl("abilities", "2.1", "aspects", `${base}.png`);
+}
+
 /** Font file (woff) for API Markup */
 export function wynnFontUrl(
 	fontName: string,

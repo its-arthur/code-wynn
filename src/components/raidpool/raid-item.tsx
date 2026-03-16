@@ -34,7 +34,7 @@ export function RaidItem({ completedData }: { completedData: CompletedData }) {
 	const { border } = getRarityStyles(rarityFormatted);
 	const nameColor = RARITY_COLORS[rarity] ?? "text-foreground";
 	const badgeClass = RARITY_BADGE[rarity] ?? RARITY_BADGE.common;
-	const iconItem = wynn ?? item.name;
+	const iconItem = wynn ?? item.icon?.value ?? item.name;
 
 	return (
 		<div className="flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/60">
