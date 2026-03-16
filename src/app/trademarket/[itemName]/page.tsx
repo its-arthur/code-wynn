@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { use } from "react";
 import Link from "next/link";
 import {
@@ -59,33 +59,22 @@ import type {
 } from "@/types/wynnventory/trademarket";
 import type { ItemEntry, ItemIdentification } from "@/types/item";
 import { cn, tierRoman } from "@/lib/utils";
+import { getRarityStyles } from "@/lib/rarity-color";
 import { ItemIcon } from "@/lib/item-icons";
 import { EmeraldPrice } from "@/components/emerald-price";
 
-const RARITY_COLORS: Record<string, string> = {
-	common: "text-gray-400",
-	unique: "text-yellow-300",
-	rare: "text-pink-400",
-	legendary: "text-cyan-300",
-	fabled: "text-red-400",
-	mythic: "text-purple-400",
-};
-
-const RARITY_BADGE: Record<string, string> = {
-	common: "bg-gray-700/60 text-gray-300 border-gray-600",
-	unique: "bg-yellow-900/40 text-yellow-300 border-yellow-700/60",
-	rare: "bg-pink-900/40 text-pink-300 border-pink-700/60",
-	legendary: "bg-cyan-900/40 text-cyan-200 border-cyan-700/60",
-	fabled: "bg-red-900/40 text-red-300 border-red-700/60",
-	mythic: "bg-purple-900/40 text-purple-300 border-purple-700/60",
-};
-
 const chartConfig = {
 	average_price: { label: "Avg", color: "hsl(142, 71%, 45%)" },
-	average_mid_80_percent_price: { label: "Mid 80%", color: "hsl(217, 91%, 60%)" },
+	average_mid_80_percent_price: {
+		label: "Mid 80%",
+		color: "hsl(217, 91%, 60%)",
+	},
 	highest_price: { label: "High", color: "hsl(0, 84%, 60%)" },
 	lowest_price: { label: "Low", color: "hsl(45, 93%, 47%)" },
-	unidentified_average_price: { label: "Unid Avg", color: "hsl(300, 60%, 60%)" },
+	unidentified_average_price: {
+		label: "Unid Avg",
+		color: "hsl(300, 60%, 60%)",
+	},
 	total_count: { label: "Volume", color: "hsl(262, 83%, 58%)" },
 } satisfies ChartConfig;
 
@@ -103,12 +92,13 @@ const ALL_SERIES: SeriesKey[] = [
 const DEFAULT_VISIBLE = new Set<SeriesKey>([
 	"average_price",
 	"average_mid_80_percent_price",
-	"highest_price",
+	"unidentified_average_price",
 	"lowest_price",
-	"total_count",
 ]);
 
-type DateRange = "1d" | "7d" | "30d" | "90d";
+type DateRange = "7d" | "30d" | "90d";
+
+const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute
 
 function formatPrice(price: number): string {
 	if (price >= 1_000_000) return `${(price / 1_000_000).toFixed(1)}M`;
@@ -158,7 +148,7 @@ function formatDateTimeFull(dateStr: string): string {
 
 function getStartDate(range: DateRange): string {
 	const d = new Date();
-	const days = range === "1d" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : 90;
+	const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
 	d.setDate(d.getDate() - days);
 	return d.toISOString().slice(0, 10);
 }
@@ -198,21 +188,17 @@ function StatCard({
 	label,
 	price,
 	sub,
-	trend,
 }: {
 	label: string;
 	price: number;
 	sub?: string;
-	trend?: "up" | "down" | null;
 }) {
 	return (
-		<Card>
+		<Card className="flex-1">
 			<CardContent className="p-4">
 				<p className="text-xs text-muted-foreground">{label}</p>
 				<div className="mt-1 flex items-center gap-1.5">
-					<EmeraldPrice price={price} size="md" />
-					{trend === "up" && <TrendingUp className="size-4 text-emerald-400" />}
-					{trend === "down" && <TrendingDown className="size-4 text-red-400" />}
+					<EmeraldPrice price={price} size="2xl" />
 				</div>
 				{sub && (
 					<p className="mt-0.5 text-[10px] text-muted-foreground">{sub}</p>
@@ -227,24 +213,36 @@ export default function TradeItemDetailPage({
 	searchParams,
 }: {
 	params: Promise<{ itemName: string }>;
-		searchParams: Promise<{ tier?: string }>;
+	searchParams: Promise<{ tier?: string }>;
 }) {
 	const { itemName } = use(params);
 	const { tier: tierParam } = use(searchParams);
 	const decodedName = decodeURIComponent(itemName);
 	const parsedTier = tierParam != null ? parseInt(tierParam, 10) : undefined;
-	const tierNum = parsedTier != null && !Number.isNaN(parsedTier) ? parsedTier : undefined;
+	const tierNum =
+		parsedTier != null && !Number.isNaN(parsedTier) ? parsedTier : undefined;
 
 	const { itemDb: cachedItemDb } = useTradeMarketStore();
-	const [itemEntry, setItemEntry] = useState<ItemEntry | null>(() =>
-		cachedItemDb[decodedName] ?? null,
+	const [itemEntry, setItemEntry] = useState<ItemEntry | null>(
+		() => cachedItemDb[decodedName] ?? null,
 	);
 	const [priceInfo, setPriceInfo] = useState<TradePriceInfo | null>(null);
 	const [history, setHistory] = useState<TradeHistoricDay[]>([]);
 	const [listings, setListings] = useState<TradeListing[]>([]);
+	const [listingsPage, setListingsPage] = useState(1);
+	const [listingsTotal, setListingsTotal] = useState(0);
 	const [listingsPageSize, setListingsPageSize] = useState(10);
+	const [listingsTab, setListingsTab] = useState<"identified" | "unidentified">(
+		"identified",
+	);
 	const [dateRange, setDateRange] = useState<DateRange>("30d");
-	const [visibleSeries, setVisibleSeries] = useState<Set<SeriesKey>>(new Set(DEFAULT_VISIBLE));
+
+	const listingsCache = useRef<
+		Map<string, { items: TradeListing[]; total: number; fetchedAt: number }>
+	>(new Map());
+	const [visibleSeries, setVisibleSeries] = useState<Set<SeriesKey>>(
+		new Set(DEFAULT_VISIBLE),
+	);
 
 	function toggleSeries(key: SeriesKey) {
 		setVisibleSeries((prev) => {
@@ -277,25 +275,38 @@ export default function TradeItemDetailPage({
 			.catch(() => {});
 	}, [decodedName, cachedItemDb]);
 
-	const fetchPrice = useCallback(() => {
-		setLoadingPrice(true);
-		setErrorPrice(null);
-		getTradePriceInfo(decodedName, tierNum != null ? { tier: tierNum } : undefined)
-			.then(setPriceInfo)
-			.catch((e) =>
-				setErrorPrice(e instanceof Error ? e.message : "Failed to load"),
+	const fetchPrice = useCallback(
+		(background = false) => {
+			if (!background) {
+				setLoadingPrice(true);
+				setErrorPrice(null);
+			}
+			getTradePriceInfo(
+				decodedName,
+				tierNum != null ? { tier: tierNum } : undefined,
 			)
-			.finally(() => setLoadingPrice(false));
-	}, [decodedName, tierNum]);
+				.then(setPriceInfo)
+				.catch((e) =>
+					setErrorPrice(e instanceof Error ? e.message : "Failed to load"),
+				)
+				.finally(() => setLoadingPrice(false));
+		},
+		[decodedName, tierNum],
+	);
 
 	const fetchHistory = useCallback(
-		(range: DateRange) => {
-			setLoadingHistory(true);
-			setErrorHistory(null);
+		(range: DateRange, background = false) => {
+			if (!background) {
+				setLoadingHistory(true);
+				setErrorHistory(null);
+			}
 			const startDate = getStartDate(range);
 			const historyParams =
 				startDate || tierNum != null
-					? { ...(startDate && { start_date: startDate }), ...(tierNum != null && { tier: tierNum }) }
+					? {
+							...(startDate && { start_date: startDate }),
+							...(tierNum != null && { tier: tierNum }),
+						}
 					: undefined;
 			getTradeHistoricDays(decodedName, historyParams)
 				.then((data) => {
@@ -316,28 +327,103 @@ export default function TradeItemDetailPage({
 		[decodedName, tierNum],
 	);
 
-	const fetchListings = useCallback(() => {
-		setLoadingListings(true);
-		setErrorListings(null);
-		getTradeListingsForItem(decodedName, {
-			page: 1,
-			page_size: listingsPageSize,
-			...(tierNum != null && { tier: tierNum }),
-		})
-			.then((data) => setListings(data.items))
-			.catch((e) =>
-				setErrorListings(e instanceof Error ? e.message : "Failed to load"),
-			)
-			.finally(() => setLoadingListings(false));
-	}, [decodedName, tierNum, listingsPageSize]);
+	const getListingsCacheKey = useCallback(
+		(page: number) =>
+			`${decodedName}|${tierNum ?? "all"}|${listingsTab}|${page}|${listingsPageSize}`,
+		[decodedName, tierNum, listingsTab, listingsPageSize],
+	);
+
+	const fetchListings = useCallback(
+		(force = false, background = false) => {
+			const cacheKey = getListingsCacheKey(listingsPage);
+			const cached = listingsCache.current.get(cacheKey);
+			const cacheValid =
+				cached && Date.now() - cached.fetchedAt < REFRESH_INTERVAL_MS;
+
+			if (!force && cacheValid) {
+				setListings(cached.items);
+				setListingsTotal(cached.total);
+				return;
+			}
+
+			if (!background) {
+				setLoadingListings(true);
+				setErrorListings(null);
+			}
+			getTradeListingsForItem(decodedName, {
+				page: listingsPage,
+				page_size: listingsPageSize,
+				...(tierNum != null && { tier: tierNum }),
+				unidentified: listingsTab === "unidentified",
+			})
+				.then((data) => {
+					setListings(data.items);
+					setListingsTotal(data.total);
+					listingsCache.current.set(cacheKey, {
+						items: data.items,
+						total: data.total,
+						fetchedAt: Date.now(),
+					});
+				})
+				.catch((e) => {
+					if (!background) {
+						setErrorListings(e instanceof Error ? e.message : "Failed to load");
+					}
+				})
+				.finally(() => setLoadingListings(false));
+		},
+		[
+			decodedName,
+			tierNum,
+			listingsPage,
+			listingsPageSize,
+			listingsTab,
+			getListingsCacheKey,
+		],
+	);
 
 	useEffect(() => {
 		fetchPrice();
 	}, [fetchPrice]);
 
 	useEffect(() => {
+		setListingsPage(1);
+		listingsCache.current.clear();
+	}, [listingsTab, listingsPageSize]);
+
+	useEffect(() => {
 		fetchListings();
 	}, [fetchListings]);
+
+	const refreshInBackground = useCallback(() => {
+		fetchPrice(true);
+		fetchHistory(dateRange, true);
+		fetchListings(true, true);
+	}, [fetchPrice, fetchHistory, dateRange, fetchListings]);
+
+	useEffect(() => {
+		const id = setInterval(refreshInBackground, REFRESH_INTERVAL_MS);
+		return () => clearInterval(id);
+	}, [refreshInBackground]);
+
+	const listingsMaxPage = Math.max(
+		1,
+		Math.ceil(listingsTotal / listingsPageSize),
+	);
+	const listingsPageNumbers = useMemo(() => {
+		const pages: (number | "ellipsis")[] = [];
+		const maxPage = listingsMaxPage;
+		const page = listingsPage;
+		const delta = 2;
+		const start = Math.max(2, page - delta);
+		const end = Math.min(maxPage - 1, page + delta);
+		pages.push(1);
+		if (start > 2) pages.push("ellipsis");
+		for (let i = start; i <= end; i++) pages.push(i);
+		if (end < maxPage - 1) pages.push("ellipsis");
+		if (maxPage > 1) pages.push(maxPage);
+		return pages;
+	}, [listingsPage, listingsMaxPage]);
 
 	useEffect(() => {
 		fetchHistory(dateRange);
@@ -346,10 +432,45 @@ export default function TradeItemDetailPage({
 	const refreshAll = () => {
 		fetchPrice();
 		fetchHistory(dateRange);
-		fetchListings();
+		fetchListings(true);
 	};
 
 	const isAnyLoading = loadingPrice || loadingHistory || loadingListings;
+
+	useEffect(() => {
+		console.log("[TradeItemDetail] data:", {
+			decodedName,
+			tierNum,
+			itemEntry: itemEntry
+				? { internalName: itemEntry.internalName, type: itemEntry.type }
+				: null,
+			priceInfo: priceInfo
+				? {
+						average_price: priceInfo.average_price,
+						total_count: priceInfo.total_count,
+					}
+				: null,
+			history: history.length,
+			listings: listings.length,
+			listingsTotal,
+			listingsPage,
+			listingsPageSize,
+			listingsTab,
+			dateRange,
+		});
+	}, [
+		decodedName,
+		tierNum,
+		itemEntry,
+		priceInfo,
+		history.length,
+		listings.length,
+		listingsTotal,
+		listingsPage,
+		listingsPageSize,
+		listingsTab,
+		dateRange,
+	]);
 
 	const rarity =
 		(itemEntry?.rarity ?? listings[0]?.rarity ?? "").toLowerCase() || null;
@@ -361,16 +482,16 @@ export default function TradeItemDetailPage({
 		tierNum != null ? `Tier ${tierRoman(tierNum)}` : null,
 		itemLevel != null ? `Lv. ${itemLevel}` : null,
 		rarity ? rarity.charAt(0).toUpperCase() + rarity.slice(1) : null,
-		itemSubType
-			? itemSubType.replace(/([A-Z])/g, " $1").trim()
-			: null,
+		itemSubType ? itemSubType.replace(/([A-Z])/g, " $1").trim() : null,
 		itemType ? itemType.replace(/([A-Z])/g, " $1").trim() : null,
 	]
 		.filter(Boolean)
 		.join(" ");
 
-	const xAxisTickFormatter = dateRange === "1d" ? formatTimeShort : formatDateShort;
-	const tooltipLabelFormatter = dateRange === "1d" ? formatDateTimeFull : formatDateFull;
+	const xAxisTickFormatter =
+		dateRange === "7d" ? formatTimeShort : formatDateShort;
+	const tooltipLabelFormatter =
+		dateRange === "7d" ? formatDateTimeFull : formatDateFull;
 
 	return (
 		<div className="space-y-6">
@@ -388,7 +509,6 @@ export default function TradeItemDetailPage({
 					disabled={isAnyLoading}
 				>
 					{isAnyLoading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-					Refresh
 				</Button>
 			</div>
 
@@ -405,22 +525,15 @@ export default function TradeItemDetailPage({
 						<h2
 							className={cn(
 								"text-xl font-semibold truncate",
-								rarity ? RARITY_COLORS[rarity] : "text-foreground",
+								rarity
+									? getRarityStyles(
+											rarity.charAt(0).toUpperCase() + rarity.slice(1),
+										).text
+									: "text-foreground",
 							)}
 						>
 							{decodedName}
 						</h2>
-						{rarity && (
-							<Badge
-								variant="outline"
-								className={cn(
-									"shrink-0 text-[10px] capitalize",
-									RARITY_BADGE[rarity] ?? "",
-								)}
-							>
-								{rarity}
-							</Badge>
-						)}
 					</div>
 					{subtitle && (
 						<p className="text-sm text-muted-foreground capitalize">
@@ -434,49 +547,29 @@ export default function TradeItemDetailPage({
 			{errorPrice && <ErrorBanner message={errorPrice} />}
 
 			{loadingPrice ? (
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-					{Array.from({ length: 4 }).map((_, i) => (
+				<div className="grid grid-cols-3 gap-3">
+					{Array.from({ length: 3 }).map((_, i) => (
 						<Skeleton key={i} className="h-[88px] rounded-lg" />
 					))}
 				</div>
 			) : priceInfo ? (
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+				<div className="grid grid-cols-3 gap-3">
 					<StatCard
-						label="Average Price"
+						label="Avg"
 						price={priceInfo.average_price}
 						sub={`${priceInfo.total_count} total sales`}
 					/>
-					<StatCard
-						label="Mid 80% Average"
-						price={priceInfo.average_mid_80_percent_price}
-						sub="Excludes outliers"
-					/>
-					<StatCard
-						label="Highest"
-						price={priceInfo.highest_price}
-						trend="up"
-					/>
-					<StatCard
-						label="Lowest"
-						price={priceInfo.lowest_price}
-						trend="down"
-					/>
+					<StatCard label="High" price={priceInfo.highest_price} />
+					<StatCard label="Low" price={priceInfo.lowest_price} />
+					{priceInfo.unidentified_count > 0 && (
+						<StatCard
+							label="Unidentified Avg"
+							price={priceInfo.unidentified_average_price}
+							sub={`${priceInfo.unidentified_count} unid sales`}
+						/>
+					)}
 				</div>
 			) : null}
-
-			{priceInfo && priceInfo.unidentified_count > 0 && (
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-					<StatCard
-						label="Unidentified Avg"
-						price={priceInfo.unidentified_average_price}
-						sub={`${priceInfo.unidentified_count} unid sales`}
-					/>
-					<StatCard
-						label="Unid Mid 80% Avg"
-						price={priceInfo.unidentified_average_mid_80_percent_price}
-					/>
-				</div>
-			)}
 
 			{/* Price history chart */}
 			<Card>
@@ -496,7 +589,10 @@ export default function TradeItemDetailPage({
 										"flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-mono transition-opacity",
 										active ? "opacity-100" : "opacity-40",
 									)}
-									style={{ borderColor: cfg.color, color: active ? cfg.color : undefined }}
+									style={{
+										borderColor: cfg.color,
+										color: active ? cfg.color : undefined,
+									}}
 								>
 									<span
 										className="size-2 rounded-full shrink-0"
@@ -509,80 +605,169 @@ export default function TradeItemDetailPage({
 					</div>
 				</CardHeader>
 				<CardContent className="space-y-3">
-
-
 					{errorHistory && <ErrorBanner message={errorHistory} />}
 
 					{loadingHistory ? (
 						<Skeleton className="h-[320px] rounded-lg" />
 					) : history.length > 0 ? (
-							<ChartContainer config={chartConfig} className="aspect-auto h-[320px] w-full">
-								<ComposedChart
+						<ChartContainer
+							config={chartConfig}
+							className="aspect-auto h-[320px] w-full"
+						>
+							<ComposedChart
 								data={history}
-									margin={{ top: 4, right: visibleSeries.has("total_count") ? 50 : 4, bottom: 0, left: 0 }}
+								margin={{
+									top: 4,
+									right: visibleSeries.has("total_count") ? 50 : 4,
+									bottom: 0,
+									left: 0,
+								}}
 							>
 								<defs>
 									<linearGradient id="fillAvg" x1="0" y1="0" x2="0" y2="1">
-											<stop offset="5%" stopColor="var(--color-average_price)" stopOpacity={0.25} />
-											<stop offset="95%" stopColor="var(--color-average_price)" stopOpacity={0} />
+										<stop
+											offset="5%"
+											stopColor="var(--color-average_price)"
+											stopOpacity={0.25}
+										/>
+										<stop
+											offset="95%"
+											stopColor="var(--color-average_price)"
+											stopOpacity={0}
+										/>
 									</linearGradient>
 									<linearGradient id="fillMid80" x1="0" y1="0" x2="0" y2="1">
-											<stop offset="5%" stopColor="var(--color-average_mid_80_percent_price)" stopOpacity={0.25} />
-											<stop offset="95%" stopColor="var(--color-average_mid_80_percent_price)" stopOpacity={0} />
+										<stop
+											offset="5%"
+											stopColor="var(--color-average_mid_80_percent_price)"
+											stopOpacity={0.25}
+										/>
+										<stop
+											offset="95%"
+											stopColor="var(--color-average_mid_80_percent_price)"
+											stopOpacity={0}
+										/>
 									</linearGradient>
 								</defs>
-									<CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-									<XAxis dataKey="date" tickFormatter={xAxisTickFormatter} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-									<YAxis yAxisId="price" tickFormatter={formatPrice} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={55} />
-									{visibleSeries.has("total_count") && (
-										<YAxis
-											yAxisId="volume"
-											orientation="right"
-											tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
-											tick={{ fontSize: 11 }}
-											tickLine={false}
-											axisLine={false}
-											width={45}
-										/>
-									)}
+								<CartesianGrid
+									strokeDasharray="3 3"
+									className="stroke-border/30"
+								/>
+								<XAxis
+									dataKey="date"
+									tickFormatter={xAxisTickFormatter}
+									tick={{ fontSize: 11 }}
+									tickLine={false}
+									axisLine={false}
+								/>
+								<YAxis
+									yAxisId="price"
+									tickFormatter={formatPrice}
+									tick={{ fontSize: 11 }}
+									tickLine={false}
+									axisLine={false}
+									width={55}
+								/>
+								{visibleSeries.has("total_count") && (
+									<YAxis
+										yAxisId="volume"
+										orientation="right"
+										tickFormatter={(v) =>
+											v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
+										}
+										tick={{ fontSize: 11 }}
+										tickLine={false}
+										axisLine={false}
+										width={45}
+									/>
+								)}
 								<ChartTooltip
 									content={
 										<ChartTooltipContent
-												labelFormatter={(v) => tooltipLabelFormatter(String(v))}
-												formatter={(value, name) => {
-													const cfg = chartConfig[name as SeriesKey];
-													return (
-														<>
-															<span className="text-muted-foreground">{cfg?.label ?? String(name)}</span>
-															{name === "total_count"
-																? <span>{Number(value).toLocaleString()} sales</span>
-																: <EmeraldPrice price={Number(value)} />
-															}
-														</>
-													);
-												}}
+											labelFormatter={(v) => tooltipLabelFormatter(String(v))}
+											formatter={(value, name) => {
+												const cfg = chartConfig[name as SeriesKey];
+												return (
+													<>
+														<span className="text-muted-foreground">
+															{cfg?.label ?? String(name)}
+														</span>
+														{name === "total_count" ? (
+															<span>
+																{Number(value).toLocaleString()} sales
+															</span>
+														) : (
+															<EmeraldPrice price={Number(value)} />
+														)}
+													</>
+												);
+											}}
 										/>
 									}
 								/>
-									{visibleSeries.has("total_count") && (
-										<Bar yAxisId="volume" dataKey="total_count" fill="var(--color-total_count)" fillOpacity={0.3} radius={[2, 2, 0, 0]} />
-									)}
-									{visibleSeries.has("average_price") && (
-										<Area yAxisId="price" type="monotone" dataKey="average_price" stroke="var(--color-average_price)" fill="url(#fillAvg)" strokeWidth={2} dot={false} />
-									)}
-									{visibleSeries.has("average_mid_80_percent_price") && (
-										<Area yAxisId="price" type="monotone" dataKey="average_mid_80_percent_price" stroke="var(--color-average_mid_80_percent_price)" fill="url(#fillMid80)" strokeWidth={2} dot={false} />
-									)}
-									{visibleSeries.has("highest_price") && (
-										<Line yAxisId="price" type="monotone" dataKey="highest_price" stroke="var(--color-highest_price)" strokeWidth={1.5} dot={false} />
-									)}
-									{visibleSeries.has("lowest_price") && (
-										<Line yAxisId="price" type="monotone" dataKey="lowest_price" stroke="var(--color-lowest_price)" strokeWidth={1.5} dot={false} />
-									)}
-									{visibleSeries.has("unidentified_average_price") && (
-										<Line yAxisId="price" type="monotone" dataKey="unidentified_average_price" stroke="var(--color-unidentified_average_price)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
-									)}
-								</ComposedChart>
+								{visibleSeries.has("total_count") && (
+									<Bar
+										yAxisId="volume"
+										dataKey="total_count"
+										fill="var(--color-total_count)"
+										fillOpacity={0.3}
+										radius={[2, 2, 0, 0]}
+									/>
+								)}
+								{visibleSeries.has("average_price") && (
+									<Area
+										yAxisId="price"
+										type="monotone"
+										dataKey="average_price"
+										stroke="var(--color-average_price)"
+										fill="url(#fillAvg)"
+										strokeWidth={2}
+										dot={false}
+									/>
+								)}
+								{visibleSeries.has("average_mid_80_percent_price") && (
+									<Area
+										yAxisId="price"
+										type="monotone"
+										dataKey="average_mid_80_percent_price"
+										stroke="var(--color-average_mid_80_percent_price)"
+										fill="url(#fillMid80)"
+										strokeWidth={2}
+										dot={false}
+									/>
+								)}
+								{visibleSeries.has("highest_price") && (
+									<Line
+										yAxisId="price"
+										type="monotone"
+										dataKey="highest_price"
+										stroke="var(--color-highest_price)"
+										strokeWidth={1.5}
+										dot={false}
+									/>
+								)}
+								{visibleSeries.has("lowest_price") && (
+									<Line
+										yAxisId="price"
+										type="monotone"
+										dataKey="lowest_price"
+										stroke="var(--color-lowest_price)"
+										strokeWidth={1.5}
+										dot={false}
+									/>
+								)}
+								{visibleSeries.has("unidentified_average_price") && (
+									<Line
+										yAxisId="price"
+										type="monotone"
+										dataKey="unidentified_average_price"
+										stroke="var(--color-unidentified_average_price)"
+										strokeWidth={1.5}
+										strokeDasharray="4 3"
+										dot={false}
+									/>
+								)}
+							</ComposedChart>
 						</ChartContainer>
 					) : (
 						<p className="py-12 text-center text-sm text-muted-foreground">
@@ -603,7 +788,11 @@ export default function TradeItemDetailPage({
 										: "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground",
 								)}
 							>
-								{range === "7d" ? "7 days" : range === "30d" ? "30 days" : "90 days"}
+								{range === "7d"
+									? "7 days"
+									: range === "30d"
+										? "30 days"
+										: "90 days"}
 							</button>
 						))}
 					</div>
@@ -613,29 +802,72 @@ export default function TradeItemDetailPage({
 			{/* Recent listings */}
 			<Card>
 				<CardHeader className="pb-2">
-					<div className="flex items-center justify-between gap-2">
-						<CardTitle className="text-sm font-medium">
-							Recent Listings
-						</CardTitle>
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex items-center gap-2">
-							<Select
-								value={String(listingsPageSize)}
-								onValueChange={(v) => setListingsPageSize(Number(v))}
-							>
-								<SelectTrigger size="sm" className="h-8 w-[72px]">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="10">10</SelectItem>
-									<SelectItem value="25">25</SelectItem>
-									<SelectItem value="50">50</SelectItem>
-								</SelectContent>
-							</Select>
+							<CardTitle className="text-sm font-medium">
+								Recent Listings
+							</CardTitle>
+							<div className="flex rounded-lg border border-border/50 w-fit p-0.5">
+								<button
+									type="button"
+									onClick={() => setListingsTab("identified")}
+									className={cn(
+										"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+										listingsTab === "identified"
+											? "bg-primary text-primary-foreground"
+											: "text-muted-foreground hover:text-foreground",
+									)}
+								>
+									Identified
+								</button>
+								<button
+									type="button"
+									onClick={() => setListingsTab("unidentified")}
+									className={cn(
+										"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+										listingsTab === "unidentified"
+											? "bg-primary text-primary-foreground"
+											: "text-muted-foreground hover:text-foreground",
+									)}
+								>
+									Unidentified
+								</button>
+							</div>
+						</div>
+						<div className="flex items-center gap-2">
+							{listingsMaxPage > 1 && !loadingListings && (
+								<div className="flex items-center gap-0.5">
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+										onClick={() => setListingsPage((p) => Math.max(1, p - 1))}
+										disabled={listingsPage <= 1}
+									>
+										{"<"}
+									</Button>
+									<span className="text-sm text-muted-foreground tabular-nums px-2 text-center">
+										{listingsPage}/{listingsMaxPage}
+									</span>
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+										onClick={() =>
+											setListingsPage((p) => Math.min(listingsMaxPage, p + 1))
+										}
+										disabled={listingsPage >= listingsMaxPage}
+									>
+										{">"}
+									</Button>
+								</div>
+							)}
+
 							<Button
-								variant="ghost"
+								variant="outline"
 								size="icon"
 								className="size-8 shrink-0"
-								onClick={fetchListings}
+								onClick={() => fetchListings(true)}
 								disabled={loadingListings}
 								title="Refresh listings"
 							>
@@ -652,48 +884,80 @@ export default function TradeItemDetailPage({
 					{errorListings && <ErrorBanner message={errorListings} />}
 
 					{loadingListings ? (
-						<div className="space-y-2">
-							{Array.from({ length: listingsPageSize }).map((_, i) => (
-								<Skeleton key={i} className="h-12 rounded-md" />
-							))}
-						</div>
-					) : listings.length > 0 ? (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Item</TableHead>
-										<TableHead className="text-right">Roll</TableHead>
-										<TableHead className="text-right">Price</TableHead>
-										<TableHead className="text-right">Time</TableHead>
+						<Table className="[&_tbody_td]:py-4">
+							<TableHeader>
+								<TableRow>
+									<TableHead>Item</TableHead>
+									<TableHead className="text-right">Roll</TableHead>
+									<TableHead className="text-right">Price</TableHead>
+									<TableHead className="text-right">Time</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{Array.from({ length: listingsPageSize }).map((_, i) => (
+									<TableRow key={i}>
+										<TableCell>
+											<Skeleton className="h-14 w-full rounded-md" />
+										</TableCell>
+										<TableCell>
+											<Skeleton className="h-14 w-full rounded-md" />
+										</TableCell>
+										<TableCell>
+											<Skeleton className="h-14 w-full rounded-md" />
+										</TableCell>
+										<TableCell>
+											<Skeleton className="h-14 w-full rounded-md" />
+										</TableCell>
 									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{listings.map((l) => (
+								))}
+							</TableBody>
+						</Table>
+					) : listings.length > 0 ? (
+						<Table className="[&_tbody_td]:py-4">
+							<TableHeader>
+								<TableRow>
+									<TableHead>Item</TableHead>
+									<TableHead className="text-right">Roll</TableHead>
+									<TableHead className="text-right">Price</TableHead>
+									<TableHead className="text-right">Time</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{listings.map((l) => {
+									const rarityFormatted = l.rarity
+										? l.rarity.charAt(0).toUpperCase() +
+											l.rarity.slice(1).toLowerCase()
+										: "";
+									const { text } = getRarityStyles(rarityFormatted);
+									return (
 										<TableRow key={`${l.hash_code}-${l.timestamp}`}>
 											<TableCell className="whitespace-normal align-top max-w-[280px]">
-												<div className="flex items-start gap-2">
+												<div className="flex items-start gap-2 font-sans">
 													<ItemIcon
 														item={l.icon?.value ?? l.name}
 														alt={l.name}
-														className="size-8 shrink-0"
+														className="size-12 shrink-0"
 													/>
-													<div className="min-w-0 ">
-														<div className="flex items-center gap-1.5 flex-wrap">
+													<div className="min-w-0">
+														<div
+															className={cn(
+																"flex items-center gap-1.5 flex-wrap",
+																text,
+															)}
+														>
 															{l.amount > 1 && (
 																<span className="text-muted-foreground text-xs tabular-nums shrink-0">
 																	{l.amount}x
 																</span>
 															)}
-															<span
-																className={cn(
-																	"text-sm font-medium",
-																	l.rarity ? RARITY_COLORS[l.rarity] : ""
-																)}
-															>
+															<span className="text-lg font-medium">
 																{l.name}
 															</span>
 															{l.unidentified && (
-																<Badge variant="outline" className="text-[9px] shrink-0">
+																<Badge
+																	variant="outline"
+																	className="text-[9px] shrink-0"
+																>
 																	Unid
 																</Badge>
 															)}
@@ -702,7 +966,7 @@ export default function TradeItemDetailPage({
 																	variant="outline"
 																	className={cn(
 																		"text-[9px] shrink-0",
-																		RARITY_BADGE[l.rarity] ?? ""
+																		getRarityStyles(rarityFormatted).badge,
 																	)}
 																>
 																	{l.rarity}
@@ -714,64 +978,151 @@ export default function TradeItemDetailPage({
 																</span>
 															)}
 															{l.tier != null && (
-																<Badge variant="secondary" className="text-[9px] shrink-0">
+																<Badge
+																	variant="secondary"
+																	className="text-[9px] shrink-0"
+																>
 																	{tierRoman(l.tier)}
 																</Badge>
 															)}
 														</div>
-														{l.stat_rolls != null && l.stat_rolls.length > 0 && (
-															<div className="flex flex-wrap gap-1 mt-1">
-																{[...l.stat_rolls]
-																	.sort((a, b) => (b.stars ?? 0) - (a.stars ?? 0))
-																	.map((s, i) => (
-																		<span
-																			key={s.apiName ?? i}
-																			className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[10px]"
-																		>
-																			<span className="text-muted-foreground capitalize">
-																				{s.displayName ?? s.apiName ?? "—"}
-																			</span>
-																			<span className="tabular-nums">
-																				{formatStatRollValue(s)}
-																			</span>
-																			{s.stars != null && s.stars > 0 && (
-																				<span className="text-amber-500" title={`${s.stars} star${s.stars !== 1 ? "s" : ""}`}>
-																					{"★".repeat(s.stars)}
+														{l.stat_rolls != null &&
+															l.stat_rolls.length > 0 && (
+																<div className="flex flex-wrap gap-1 mt-1">
+																	{[...l.stat_rolls]
+																		.sort(
+																			(a, b) => (b.stars ?? 0) - (a.stars ?? 0),
+																		)
+																		.map((s, i) => (
+																			<span
+																				key={s.apiName ?? i}
+																				className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[10px]"
+																			>
+																				<span className="text-muted-foreground capitalize">
+																					{s.displayName ?? s.apiName ?? "—"}
 																				</span>
-																			)}
-																		</span>
-																	))}
-															</div>
-														)}
+																				<span className="tabular-nums">
+																					{formatStatRollValue(s)}
+																				</span>
+																				{s.stars != null && s.stars > 0 && (
+																					<span
+																						className="text-amber-500"
+																						title={`${s.stars} star${s.stars !== 1 ? "s" : ""}`}
+																					>
+																						{"★".repeat(s.stars)}
+																					</span>
+																				)}
+																			</span>
+																		))}
+																</div>
+															)}
 													</div>
 												</div>
 											</TableCell>
-											<TableCell className="text-right tabular-nums">
-												{!l.unidentified && l.overall_roll != null && l.overall_roll > 0 ? (
+											<TableCell className="text-right font-mono tabular-nums">
+												{!l.unidentified &&
+												l.overall_roll != null &&
+												l.overall_roll > 0 ? (
 													<span className="text-muted-foreground">
 														{l.overall_roll.toFixed(1)}%
 														{l.reroll_count != null && l.reroll_count > 0 && (
-															<span className="text-xs"> x{l.reroll_count}</span>
+															<span className="text-xs">
+																{" "}
+																x{l.reroll_count}
+															</span>
 														)}
 													</span>
 												) : (
 													<span className="text-muted-foreground">—</span>
 												)}
 											</TableCell>
-											<TableCell className="text-right">
-												<EmeraldPrice price={l.listing_price} />
+											<TableCell className="text-right font-mono">
+												<EmeraldPrice price={l.listing_price} size="lg" />
 											</TableCell>
-											<TableCell className="text-right text-muted-foreground text-[10px]">
+											<TableCell
+												className="text-right text-muted-foreground text-sm"
+												suppressHydrationWarning
+											>
 												{formatTimeElapsed(l.timestamp)}
 											</TableCell>
 										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+									);
+								})}
+							</TableBody>
+						</Table>
 					) : (
 						<p className="py-8 text-center text-sm text-muted-foreground">
 							No active listings found.
 						</p>
+					)}
+
+					{!loadingListings && listings.length > 0 && (
+						<div className="flex items-center pt-2 w-full">
+							<div className="flex-1 shrink-0 min-w-0 items-center gap-2 font-sans flex">
+								<p className="text-sm text-muted-foreground">Limit:</p>
+								<Select
+									value={String(listingsPageSize)}
+									onValueChange={(v) => setListingsPageSize(Number(v))}
+								>
+									<SelectTrigger size="sm" className="h-8 w-[80px]">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="10">10</SelectItem>
+										<SelectItem value="25">25</SelectItem>
+										<SelectItem value="50">50</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="flex-1 flex items-center justify-center gap-2">
+								{listingsMaxPage > 1 && (
+									<>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setListingsPage((p) => Math.max(1, p - 1))}
+											disabled={listingsPage <= 1}
+										>
+											‹
+										</Button>
+
+										{listingsPageNumbers.map(
+											(p: number | "ellipsis", i: number) =>
+												p === "ellipsis" ? (
+													<span
+														key={`e-${i}`}
+														className="flex size-8 items-center justify-center text-xs text-muted-foreground"
+													>
+														…
+													</span>
+												) : (
+													<Button
+														key={p}
+														variant={p === listingsPage ? "secondary" : "ghost"}
+														size="sm"
+														className="text-xs"
+														onClick={() => setListingsPage(p)}
+													>
+														{p}
+													</Button>
+												),
+										)}
+
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() =>
+												setListingsPage((p) => Math.min(listingsMaxPage, p + 1))
+											}
+											disabled={listingsPage >= listingsMaxPage}
+										>
+											›
+										</Button>
+									</>
+								)}
+							</div>
+							<div className="flex-1 shrink-0 min-w-0" aria-hidden />
+						</div>
 					)}
 				</CardContent>
 			</Card>
@@ -826,47 +1177,69 @@ export default function TradeItemDetailPage({
 						</div>
 
 						{/* Requirements */}
-						{itemEntry.requirements && Object.keys(itemEntry.requirements).length > 0 && (
-							<div>
-								<p className="mb-2 text-xs font-medium text-muted-foreground">Requirements</p>
-								<div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-									{itemEntry.requirements.level != null && (
-										<span>Lv. {itemEntry.requirements.level}</span>
-									)}
-									{(itemEntry.requirements.class_requirement ?? (itemEntry.requirements as { classRequirement?: string }).classRequirement) && (
-										<span className="capitalize">
-											{(itemEntry.requirements.class_requirement ?? (itemEntry.requirements as { classRequirement?: string }).classRequirement)?.replace(/_/g, " ")}
-										</span>
-									)}
-									{itemEntry.requirements.strength != null && (
-										<span>Str {itemEntry.requirements.strength}</span>
-									)}
-									{itemEntry.requirements.dexterity != null && (
-										<span>Dex {itemEntry.requirements.dexterity}</span>
-									)}
-									{itemEntry.requirements.intelligence != null && (
-										<span>Int {itemEntry.requirements.intelligence}</span>
-									)}
-									{itemEntry.requirements.defence != null && (
-										<span>Def {itemEntry.requirements.defence}</span>
-									)}
-									{itemEntry.requirements.agility != null && (
-										<span>Agi {itemEntry.requirements.agility}</span>
-									)}
+						{itemEntry.requirements &&
+							Object.keys(itemEntry.requirements).length > 0 && (
+								<div>
+									<p className="mb-2 text-xs font-medium text-muted-foreground">
+										Requirements
+									</p>
+									<div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+										{itemEntry.requirements.level != null && (
+											<span>Lv. {itemEntry.requirements.level}</span>
+										)}
+										{(itemEntry.requirements.class_requirement ??
+											(itemEntry.requirements as { classRequirement?: string })
+												.classRequirement) && (
+											<span className="capitalize">
+												{(
+													itemEntry.requirements.class_requirement ??
+													(
+														itemEntry.requirements as {
+															classRequirement?: string;
+														}
+													).classRequirement
+												)?.replace(/_/g, " ")}
+											</span>
+										)}
+										{itemEntry.requirements.strength != null && (
+											<span>Str {itemEntry.requirements.strength}</span>
+										)}
+										{itemEntry.requirements.dexterity != null && (
+											<span>Dex {itemEntry.requirements.dexterity}</span>
+										)}
+										{itemEntry.requirements.intelligence != null && (
+											<span>Int {itemEntry.requirements.intelligence}</span>
+										)}
+										{itemEntry.requirements.defence != null && (
+											<span>Def {itemEntry.requirements.defence}</span>
+										)}
+										{itemEntry.requirements.agility != null && (
+											<span>Agi {itemEntry.requirements.agility}</span>
+										)}
+									</div>
 								</div>
-							</div>
-						)}
+							)}
 
 						{/* Base stats */}
 						{itemEntry.base && Object.keys(itemEntry.base).length > 0 && (
 							<div>
-								<p className="mb-2 text-xs font-medium text-muted-foreground">Base</p>
+								<p className="mb-2 text-xs font-medium text-muted-foreground">
+									Base
+								</p>
 								<div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
 									{Object.entries(itemEntry.base).map(([key, val]) => {
 										if (val == null) return null;
-										const v = val as { min?: number; max?: number; raw?: number };
+										const v = val as {
+											min?: number;
+											max?: number;
+											raw?: number;
+										};
 										if (typeof v === "object" && "min" in v && "max" in v) {
-											const label = key.replace(/^base/, "").replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+											const label = key
+												.replace(/^base/, "")
+												.replace(/([A-Z])/g, " $1")
+												.replace(/^./, (s) => s.toUpperCase())
+												.trim();
 											return (
 												<span key={key}>
 													{label}: {v.min}–{v.max}
@@ -880,33 +1253,49 @@ export default function TradeItemDetailPage({
 						)}
 
 						{/* Identifications */}
-						{itemEntry.identifications && Object.keys(itemEntry.identifications).length > 0 && (
-							<div>
-								<p className="mb-2 text-xs font-medium text-muted-foreground">Identifications</p>
-								<div className="grid gap-1.5 text-sm sm:grid-cols-2">
-									{Object.entries(itemEntry.identifications).map(([key, val]) => {
-										const id = val as number | ItemIdentification;
-										const isRange = typeof id === "object" && id != null && "min" in id && "max" in id;
-										const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
-										return (
-											<div key={key} className="flex justify-between gap-2">
-												<span className="text-muted-foreground capitalize">{label}</span>
-												<span className="tabular-nums">
-													{isRange
-														? `${(id as ItemIdentification).min} ~ ${(id as ItemIdentification).raw} ~ ${(id as ItemIdentification).max}`
-														: String(id)}
-												</span>
-											</div>
-										);
-									})}
+						{itemEntry.identifications &&
+							Object.keys(itemEntry.identifications).length > 0 && (
+								<div>
+									<p className="mb-2 text-xs font-medium text-muted-foreground">
+										Identifications
+									</p>
+									<div className="grid gap-1.5 text-sm sm:grid-cols-2">
+										{Object.entries(itemEntry.identifications).map(
+											([key, val]) => {
+												const id = val as number | ItemIdentification;
+												const isRange =
+													typeof id === "object" &&
+													id != null &&
+													"min" in id &&
+													"max" in id;
+												const label = key
+													.replace(/([A-Z])/g, " $1")
+													.replace(/^./, (s) => s.toUpperCase())
+													.trim();
+												return (
+													<div key={key} className="flex justify-between gap-2">
+														<span className="text-muted-foreground capitalize">
+															{label}
+														</span>
+														<span className="tabular-nums">
+															{isRange
+																? `${(id as ItemIdentification).min} ~ ${(id as ItemIdentification).raw} ~ ${(id as ItemIdentification).max}`
+																: String(id)}
+														</span>
+													</div>
+												);
+											},
+										)}
+									</div>
 								</div>
-							</div>
-						)}
+							)}
 
 						{/* Lore */}
 						{itemEntry.lore && (
 							<div>
-								<p className="mb-2 text-xs font-medium text-muted-foreground">Lore</p>
+								<p className="mb-2 text-xs font-medium text-muted-foreground">
+									Lore
+								</p>
 								<p className="text-sm italic text-muted-foreground leading-relaxed">
 									{itemEntry.lore}
 								</p>

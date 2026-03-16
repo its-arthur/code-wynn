@@ -7,7 +7,6 @@ export interface CompletedData<T> {
 	wynnInv: T;
 }
 
-
 export interface StatRoll {
 	displayName?: string;
 	apiName?: string;

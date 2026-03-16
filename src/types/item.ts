@@ -85,6 +85,7 @@ export interface ItemEntry {
 
 	armourType?: string;
 	armourMaterial?: string;
+	accessoryType?: string;
 	attackSpeed?: string;
 	averageDPS?: number;
 	gatheringSpeed?: number;

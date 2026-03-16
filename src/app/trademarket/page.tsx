@@ -2,7 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, RefreshCw, Search } from "lucide-react";
+import {
+	ArrowDown,
+	ArrowUp,
+	ArrowUpDown,
+	Check,
+	ChevronDown,
+	Loader2,
+	RefreshCw,
+	Search,
+	X,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -20,7 +36,9 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { getItemMetadata } from "@/api/item";
 import { useTradeMarketStore } from "@/store/trademarket-store";
+import type { ItemMetadata } from "@/types/item";
 import type {
 	MergedPopularEntry,
 	MergedNewlyListedEntry,
@@ -29,19 +47,93 @@ import type { ItemEntry } from "@/types/item";
 import { ItemIcon } from "@/lib/item-icons";
 import { ItemSearchInput } from "@/components/items/item-search-input";
 import { EmeraldPrice } from "@/components/emerald-price";
+import { Input } from "@/components/ui/input";
 import { cn, tierRoman, formatTimeElapsed } from "@/lib/utils";
 import { getRarityStyles } from "@/lib/rarity-color";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+
+const GEAR_TYPES = ["armour", "armor", "weapon", "accessory"];
+const MATERIAL_TYPES = ["material", "ingredient"];
+
+const TIER_ROMAN_TO_NUM: Record<string, number> = {
+	I: 1,
+	II: 2,
+	III: 3,
+	IV: 4,
+	V: 5,
+	VI: 6,
+	VII: 7,
+	VIII: 8,
+	IX: 9,
+	X: 10,
+	XI: 11,
+	XII: 12,
+	XIII: 13,
+	XIV: 14,
+	XV: 15,
+	XVI: 16,
+	XVII: 17,
+	XVIII: 18,
+	XIX: 19,
+	XX: 20,
+};
+
+function parseTierFromString(s: string): number | null {
+	const n = parseInt(s, 10);
+	if (!Number.isNaN(n) && n >= 1 && n <= 20) return n;
+	const upper = s.toUpperCase().trim();
+	return TIER_ROMAN_TO_NUM[upper] ?? null;
+}
+
+function isGearType(type: string | undefined): boolean {
+	if (!type) return false;
+	const t = type.toLowerCase();
+	return GEAR_TYPES.includes(t);
+}
+
+function isMaterialType(type: string | undefined): boolean {
+	if (!type) return false;
+	const t = type.toLowerCase();
+	return MATERIAL_TYPES.includes(t);
+}
 
 function getItemTypeDisplay(item: ItemEntry | undefined): string | undefined {
 	if (!item) return undefined;
 	const withExtras = item as ItemEntry & { weaponType?: string };
 	if (withExtras.weaponType)
 		return withExtras.weaponType.replace(/([A-Z])/g, " $1").trim();
-	if (item.type?.toLowerCase() === "armour" || item.type?.toLowerCase() === "armor")
+	if (
+		item.type?.toLowerCase() === "armour" ||
+		item.type?.toLowerCase() === "armor"
+	)
 		return (item.armourType ?? item.subType)?.replace(/([A-Z])/g, " $1").trim();
 	return item.type?.replace(/([A-Z])/g, " $1").trim();
+}
+
+/** Get item field value for advanced filter key (weapon->weaponType, armour->armourType, accessory->accessoryType, attackSpeed->attackSpeed, else subType) */
+function getItemAdvancedValue(
+	item: ItemEntry | undefined,
+	advKey: string,
+): string | undefined {
+	if (!item) return undefined;
+	const ext = item as ItemEntry & { weaponType?: string };
+	const k = advKey.toLowerCase();
+	if (k === "weapon") return ext.weaponType ?? item.subType;
+	if (k === "armour" || k === "armor") return item.armourType ?? item.subType;
+	if (k === "accessory") return item.accessoryType ?? item.subType;
+	if (k === "attackspeed") return item.attackSpeed;
+	return item.subType;
+}
+
+function itemMatchesAdvancedFilter(
+	item: ItemEntry | undefined,
+	advKey: string,
+	advValue: string,
+): boolean {
+	const val = getItemAdvancedValue(item, advKey);
+	if (!val) return false;
+	return val.toLowerCase() === advValue.toLowerCase();
 }
 
 const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute
@@ -66,19 +158,20 @@ function getWynnItem(
 const POWDER_TYPES = ["fire", "water", "air", "thunder", "earth"];
 const CORKIAN_TYPES = ["amplifier", "insulator", "simulator"];
 
-/** Detect enchanter subtype: rune, powder, corkian, or key */
+/** Detect enchanter subtype: rune, powder, or corkian (keys are separate type) */
 function getEnchanterSubType(
 	name: string,
 	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): "rune" | "powder" | "corkian" | "key" | null {
+): "rune" | "powder" | "corkian" | null {
 	const n = name.toLowerCase();
-	const itemType = wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
+	const itemType =
+		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
 
 	if (n.includes("rune") || itemType.includes("rune")) return "rune";
-	if (n.includes("key") || itemType.includes("key")) return "key";
 
 	for (const p of POWDER_TYPES) {
-		if (n.startsWith(p) || n.includes(` ${p} `) || n === `${p} powder`) return "powder";
+		if (n.startsWith(p) || n.includes(` ${p} `) || n === `${p} powder`)
+			return "powder";
 	}
 	if (n.includes("powder") || itemType.includes("powder")) return "powder";
 
@@ -90,7 +183,7 @@ function getEnchanterSubType(
 	return null;
 }
 
-/** Detect if item is rune, key, powder, or corkian (not in Wynncraft item DB) */
+/** Detect if item is rune, powder, or corkian (not in Wynncraft item DB) */
 function isEnchanterItem(
 	name: string,
 	wynnInv?: { item_type?: string; type?: string; rarity?: string },
@@ -98,13 +191,13 @@ function isEnchanterItem(
 	return getEnchanterSubType(name, wynnInv) != null;
 }
 
-/** Create mock wynn{} for runes, keys, powders, corkian – type: enchanter, subType: rune|powder|corkian|key */
+/** Create mock wynn{} for runes, powders, corkian – type: enchanter, subType: rune|powder|corkian */
 function createMockWynnForEnchanterItem(
 	name: string,
 	tier: number | null,
 	wynnInv?: { item_type?: string; type?: string; rarity?: string },
 ): ItemEntry {
-	const subType = getEnchanterSubType(name, wynnInv) ?? "key";
+	const subType = getEnchanterSubType(name, wynnInv) ?? "rune";
 	const rarity = wynnInv?.rarity ?? "common";
 	return {
 		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
@@ -114,7 +207,95 @@ function createMockWynnForEnchanterItem(
 	};
 }
 
-/** Resolve wynn data: real from itemDb, or mock for enchanter items (rune/key/powder/corkian) */
+/** Detect if item is a dungeon key – not in Wynncraft item DB */
+function isKeyItem(
+	name: string,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): boolean {
+	const n = name.toLowerCase();
+	const itemType =
+		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
+	return n.includes("key") || itemType.includes("key");
+}
+
+/** Create mock wynn{} for keys – type: key, subType: Dungeon Key */
+function createMockWynnForKeyItem(
+	name: string,
+	tier: number | null,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): ItemEntry {
+	const rarity = wynnInv?.rarity ?? "common";
+	return {
+		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
+		type: "key",
+		subType: "Dungeon Key",
+		rarity,
+	};
+}
+
+/** Detect if item is a mount (horse) – not in Wynncraft item DB */
+function isMountItem(
+	name: string,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): boolean {
+	const n = name.toLowerCase();
+	const itemType =
+		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
+	return (
+		n.includes("horse") ||
+		n.includes("mount") ||
+		itemType.includes("horse") ||
+		itemType.includes("mount")
+	);
+}
+
+/** Create mock wynn{} for mounts – type: Mounts, subType: Horse */
+function createMockWynnForMountItem(
+	name: string,
+	tier: number | null,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): ItemEntry {
+	const rarity = wynnInv?.rarity ?? "common";
+	return {
+		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
+		type: "Mounts",
+		subType: "Horse",
+		rarity,
+	};
+}
+
+/** Detect if item is emerald pouch – not in Wynncraft item DB */
+function isEmeraldPouchItem(
+	name: string,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): boolean {
+	const n = name.toLowerCase().replace(/\s/g, "");
+	const itemType =
+		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
+	return (
+		n.includes("emeraldpouch") ||
+		(n.includes("emerald") && n.includes("pouch")) ||
+		itemType.includes("emeraldpouch") ||
+		(itemType.includes("emerald") && itemType.includes("pouch"))
+	);
+}
+
+/** Create mock wynn{} for emerald pouch – type: Other, subType: Emeraldpouch */
+function createMockWynnForEmeraldPouchItem(
+	name: string,
+	tier: number | null,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): ItemEntry {
+	const rarity = wynnInv?.rarity ?? "common";
+	return {
+		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
+		type: "Emeraldpouch",
+		subType: "Other",
+		rarity,
+	};
+}
+
+/** Resolve wynn data: real from itemDb, or mock for key/enchanter/mount/other items */
 function resolveWynnData(
 	itemDb: Record<string, ItemEntry>,
 	name: string,
@@ -123,8 +304,17 @@ function resolveWynnData(
 ): ItemEntry | undefined {
 	const wynn = getWynnItem(itemDb, name, tier);
 	if (wynn) return wynn;
+	if (isKeyItem(name, wynnInv)) {
+		return createMockWynnForKeyItem(name, tier, wynnInv);
+	}
 	if (isEnchanterItem(name, wynnInv)) {
 		return createMockWynnForEnchanterItem(name, tier, wynnInv);
+	}
+	if (isMountItem(name, wynnInv)) {
+		return createMockWynnForMountItem(name, tier, wynnInv);
+	}
+	if (isEmeraldPouchItem(name, wynnInv)) {
+		return createMockWynnForEmeraldPouchItem(name, tier, wynnInv);
 	}
 	return undefined;
 }
@@ -147,13 +337,37 @@ export default function TradeMarketPage() {
 	const [appliedSearch, setAppliedSearch] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(50);
-	const [sortKey, setSortKey] = useState<"name" | "lowest" | "average" | "quantity" | "price" | "listed">("quantity");
+	const [sortKey, setSortKey] = useState<
+		"name" | "lowest" | "average" | "quantity" | "price" | "listed"
+	>("quantity");
 	const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+	const [filterType, setFilterType] = useState<string | null>(null);
+	const [filterAdvanced, setFilterAdvanced] = useState<Record<string, string>>(
+		{},
+	);
+	const [filterTierItem, setFilterTierItem] = useState<string | null>(null);
+	const [filterIngredientTier, setFilterIngredientTier] = useState<
+		string | null
+	>(null);
+	const [levelMinInput, setLevelMinInput] = useState("");
+	const [levelMaxInput, setLevelMaxInput] = useState("");
+	const [filterLevelMin, setFilterLevelMin] = useState<number | null>(null);
+	const [filterLevelMax, setFilterLevelMax] = useState<number | null>(null);
 	useEffect(() => {
 		setPage(1);
 		setSortKey(tab === "popular" ? "quantity" : "listed");
 		setSortDir("desc");
 	}, [tab]);
+	useEffect(() => {
+		setPage(1);
+	}, [
+		filterType,
+		filterAdvanced,
+		filterTierItem,
+		filterIngredientTier,
+		filterLevelMin,
+		filterLevelMax,
+	]);
 	useEffect(() => {
 		setPage(1);
 	}, [pageSize]);
@@ -172,9 +386,103 @@ export default function TradeMarketPage() {
 		return () => clearInterval(id);
 	}, [refreshInBackground]);
 
+	const [metadata, setMetadata] = useState<ItemMetadata | null>(null);
+	useEffect(() => {
+		getItemMetadata()
+			.then(setMetadata)
+			.catch(() => {});
+	}, []);
+
 	const mergedPopular = useMemo((): MergedPopularEntry[] => {
-		let result = ranking
-			.sort((a, b) => b.total_count - a.total_count);
+		let result = ranking.sort((a, b) => b.total_count - a.total_count);
+		if (filterType) {
+			if (filterType === "gearItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					return isGearType(wynn?.type);
+				});
+			} else if (filterType === "MaterialItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					return wynn?.type?.toLowerCase() === "material";
+				});
+			} else if (filterType === "IngredientItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					return wynn?.type?.toLowerCase() === "ingredient";
+				});
+			} else if (filterType === "DungeonKeyItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					return wynn?.type?.toLowerCase() === "key";
+				});
+			} else if (filterType === "MountItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					const t = wynn?.type?.toLowerCase() ?? "";
+					return t === "mounts" || t.includes("mount");
+				});
+			} else if (filterType === "EnchanterItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					return wynn?.type?.toLowerCase() === "enchanter";
+				});
+			} else if (filterType === "OtherItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					const type = wynn?.type?.toLowerCase() ?? "";
+					const subType = wynn?.subType?.toLowerCase() ?? "";
+					return (
+						type === "other" || subType === "other" || type === "emeraldpouch"
+					);
+				});
+			} else {
+				const t = filterType.toLowerCase();
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					return (
+						wynn?.type?.toLowerCase() === t ||
+						wynn?.subType?.toLowerCase() === t
+					);
+				});
+			}
+		}
+		if (Object.keys(filterAdvanced).length > 0) {
+			const advEntries = Object.entries(filterAdvanced).filter(
+				([k]) => k.toLowerCase() !== "attackspeed",
+			);
+			if (advEntries.length > 0) {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier);
+					return advEntries.every(([advKey, advValue]) =>
+						itemMatchesAdvancedFilter(wynn ?? undefined, advKey, advValue),
+					);
+				});
+			}
+		}
+		if (filterTierItem) {
+			const tierLower = filterTierItem.toLowerCase();
+			// metadata.filters.tier.items = rarity names (common, unique, rare, etc.)
+			result = result.filter((r) => {
+				const wynn = resolveWynnData(itemDb, r.name, r.tier);
+				const rarity = wynn?.rarity?.toLowerCase() ?? "";
+				return rarity === tierLower;
+			});
+		}
+		if (filterIngredientTier) {
+			const tierNum = Number(filterIngredientTier);
+			result = result.filter((r) => r.tier === tierNum);
+		}
+		if (filterLevelMin != null || filterLevelMax != null) {
+			result = result.filter((r) => {
+				const wynn = resolveWynnData(itemDb, r.name, r.tier);
+				const level = wynn?.requirements?.level;
+				if (level == null) return false;
+				if (filterLevelMin != null && level < filterLevelMin) return false;
+				if (filterLevelMax != null && level > filterLevelMax) return false;
+				return true;
+			});
+		}
 		if (appliedSearch.trim()) {
 			const q = appliedSearch.trim().toLowerCase();
 			result = result.filter((r) => {
@@ -194,10 +502,159 @@ export default function TradeMarketPage() {
 				wynnInv: r,
 			},
 		}));
-	}, [ranking, itemDb, appliedSearch]);
+	}, [
+		ranking,
+		itemDb,
+		appliedSearch,
+		filterType,
+		filterAdvanced,
+		filterTierItem,
+		filterIngredientTier,
+		filterLevelMin,
+		filterLevelMax,
+	]);
 
 	const mergedNewlyListed = useMemo((): MergedNewlyListedEntry[] => {
 		let result = listings;
+		if (filterType) {
+			if (filterType === "gearItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					return isGearType(wynn?.type) || isGearType(listingType);
+				});
+			} else if (filterType === "MaterialItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					const type =
+						wynn?.type?.toLowerCase() ?? listingType?.toLowerCase() ?? "";
+					return type === "material";
+				});
+			} else if (filterType === "IngredientItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					return (
+						wynn?.type?.toLowerCase() === "ingredient" ||
+						listingType?.toLowerCase() === "ingredient"
+					);
+				});
+			} else if (filterType === "DungeonKeyItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					return (
+						wynn?.type?.toLowerCase() === "key" ||
+						listingType?.toLowerCase() === "key"
+					);
+				});
+			} else if (filterType === "MountItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					const t = wynn?.type?.toLowerCase() ?? "";
+					const lt = listingType?.toLowerCase() ?? "";
+					return (
+						t === "mounts" ||
+						t.includes("mount") ||
+						lt === "mounts" ||
+						lt.includes("mount")
+					);
+				});
+			} else if (filterType === "EnchanterItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					return (
+						wynn?.type?.toLowerCase() === "enchanter" ||
+						listingType?.toLowerCase() === "enchanter"
+					);
+				});
+			} else if (filterType === "OtherItem") {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					const type = wynn?.type?.toLowerCase() ?? "";
+					const subType = wynn?.subType?.toLowerCase() ?? "";
+					const lt = listingType?.toLowerCase() ?? "";
+					return (
+						type === "other" ||
+						subType === "other" ||
+						type === "emeraldpouch" ||
+						lt === "other" ||
+						lt === "emeraldpouch"
+					);
+				});
+			} else {
+				const t = filterType.toLowerCase();
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listingType =
+						(r.listing as { type?: string; item_type?: string })?.type ??
+						(r.listing as { type?: string; item_type?: string })?.item_type;
+					return (
+						wynn?.type?.toLowerCase() === t ||
+						wynn?.subType?.toLowerCase() === t ||
+						listingType?.toLowerCase() === t
+					);
+				});
+			}
+		}
+		if (Object.keys(filterAdvanced).length > 0) {
+			const advEntries = Object.entries(filterAdvanced).filter(
+				([k]) => k.toLowerCase() !== "attackspeed",
+			);
+			if (advEntries.length > 0) {
+				result = result.filter((r) => {
+					const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+					const listing = r.listing as { type?: string; item_type?: string };
+					return advEntries.every(([advKey, advValue]) => {
+						if (wynn) return itemMatchesAdvancedFilter(wynn, advKey, advValue);
+						const listingType = listing?.type ?? listing?.item_type ?? "";
+						return listingType?.toLowerCase() === advValue.toLowerCase();
+					});
+				});
+			}
+		}
+		if (filterTierItem) {
+			const tierLower = filterTierItem.toLowerCase();
+			// metadata.filters.tier.items = rarity names (common, unique, rare, etc.)
+			result = result.filter((r) => {
+				const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+				const listingRarity = r.listing.rarity?.toLowerCase();
+				const rarity = wynn?.rarity?.toLowerCase() ?? listingRarity ?? "";
+				return rarity === tierLower;
+			});
+		}
+		if (filterIngredientTier) {
+			const tierNum = Number(filterIngredientTier);
+			result = result.filter((r) => r.tier === tierNum);
+		}
+		if (filterLevelMin != null || filterLevelMax != null) {
+			result = result.filter((r) => {
+				const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+				const level = wynn?.requirements?.level;
+				if (level == null) return false;
+				if (filterLevelMin != null && level < filterLevelMin) return false;
+				if (filterLevelMax != null && level > filterLevelMax) return false;
+				return true;
+			});
+		}
 		if (appliedSearch.trim()) {
 			const q = appliedSearch.trim().toLowerCase();
 			result = result.filter((r) => {
@@ -221,10 +678,19 @@ export default function TradeMarketPage() {
 				},
 			},
 		}));
-	}, [listings, itemDb, appliedSearch]);
+	}, [
+		listings,
+		itemDb,
+		appliedSearch,
+		filterType,
+		filterAdvanced,
+		filterTierItem,
+		filterIngredientTier,
+		filterLevelMin,
+		filterLevelMax,
+	]);
 
-	const filtered =
-		tab === "popular" ? mergedPopular : mergedNewlyListed;
+	const filtered = tab === "popular" ? mergedPopular : mergedNewlyListed;
 	const isRankingData = tab === "popular";
 
 	const sortedFiltered = useMemo(() => {
@@ -232,21 +698,50 @@ export default function TradeMarketPage() {
 		const dir = sortDir === "asc" ? 1 : -1;
 		arr.sort((a, b) => {
 			if (sortKey === "name") {
-				const na = (a as MergedPopularEntry | MergedNewlyListedEntry).name.toLowerCase();
-				const nb = (b as MergedPopularEntry | MergedNewlyListedEntry).name.toLowerCase();
+				const na = (
+					a as MergedPopularEntry | MergedNewlyListedEntry
+				).name.toLowerCase();
+				const nb = (
+					b as MergedPopularEntry | MergedNewlyListedEntry
+				).name.toLowerCase();
 				return dir * na.localeCompare(nb);
 			}
 			if (isRankingData) {
 				const ea = a as MergedPopularEntry;
 				const eb = b as MergedPopularEntry;
-				if (sortKey === "lowest") return dir * (ea.completedData.wynnInv.lowest_price - eb.completedData.wynnInv.lowest_price);
-				if (sortKey === "average") return dir * (ea.completedData.wynnInv.average_price - eb.completedData.wynnInv.average_price);
-				if (sortKey === "quantity") return dir * (ea.completedData.wynnInv.total_count - eb.completedData.wynnInv.total_count);
+				if (sortKey === "lowest")
+					return (
+						dir *
+						(ea.completedData.wynnInv.lowest_price -
+							eb.completedData.wynnInv.lowest_price)
+					);
+				if (sortKey === "average")
+					return (
+						dir *
+						(ea.completedData.wynnInv.average_price -
+							eb.completedData.wynnInv.average_price)
+					);
+				if (sortKey === "quantity")
+					return (
+						dir *
+						(ea.completedData.wynnInv.total_count -
+							eb.completedData.wynnInv.total_count)
+					);
 			} else {
 				const ea = a as MergedNewlyListedEntry;
 				const eb = b as MergedNewlyListedEntry;
-				if (sortKey === "price") return dir * (ea.completedData.wynnInv.listing_price - eb.completedData.wynnInv.listing_price);
-				if (sortKey === "listed") return dir * (new Date(ea.completedData.wynnInv.timestamp).getTime() - new Date(eb.completedData.wynnInv.timestamp).getTime());
+				if (sortKey === "price")
+					return (
+						dir *
+						(ea.completedData.wynnInv.listing_price -
+							eb.completedData.wynnInv.listing_price)
+					);
+				if (sortKey === "listed")
+					return (
+						dir *
+						(new Date(ea.completedData.wynnInv.timestamp).getTime() -
+							new Date(eb.completedData.wynnInv.timestamp).getTime())
+					);
 			}
 			return 0;
 		});
@@ -255,7 +750,10 @@ export default function TradeMarketPage() {
 
 	const total = sortedFiltered.length;
 	const maxPage = Math.max(1, Math.ceil(total / pageSize));
-	const pageItems = sortedFiltered.slice((page - 1) * pageSize, page * pageSize);
+	const pageItems = sortedFiltered.slice(
+		(page - 1) * pageSize,
+		page * pageSize,
+	);
 
 	function toggleSort(key: typeof sortKey) {
 		if (sortKey === key) {
@@ -268,8 +766,13 @@ export default function TradeMarketPage() {
 	}
 
 	function SortIcon({ column }: { column: typeof sortKey }) {
-		if (sortKey !== column) return <ArrowUpDown className="ml-1 size-3.5 opacity-50" />;
-		return sortDir === "asc" ? <ArrowUp className="ml-1 size-3.5" /> : <ArrowDown className="ml-1 size-3.5" />;
+		if (sortKey !== column)
+			return <ArrowUpDown className="ml-1 size-3.5 opacity-50" />;
+		return sortDir === "asc" ? (
+			<ArrowUp className="ml-1 size-3.5" />
+		) : (
+			<ArrowDown className="ml-1 size-3.5" />
+		);
 	}
 	const pageNumbers = useMemo(() => {
 		const pages: (number | "ellipsis")[] = [];
@@ -286,15 +789,30 @@ export default function TradeMarketPage() {
 		return pages;
 	}, [page, maxPage]);
 
+	useEffect(() => {
+		pageItems.forEach((entry) => {
+			const m = entry as MergedPopularEntry | MergedNewlyListedEntry;
+			console.log(
+				`[TradeMarket] ${m.name}${m.tier != null ? ` ${m.tier}` : ""}`,
+				{
+					completedData: {
+						wynn: m.completedData.wynn,
+						wynnInv: m.completedData.wynnInv,
+					},
+				},
+			);
+		});
+	}, [pageItems]);
+
 	return (
-		<div className="flex flex-col gap-6 lg:flex-row">
+		<div className="flex flex-col gap-6 lg:flex-row lg:items-start relative">
 			{/* Main content */}
 			<div className="min-w-0 flex-1 space-y-4">
 				<div className="flex flex-col gap-3">
 					<div className="flex flex-wrap items-center gap-2">
 						<div className="flex rounded-lg border border-border/50 p-0.5">
-						<button
-							type="button"
+							<button
+								type="button"
 								onClick={() => setTab("popular")}
 								className={cn(
 									"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -351,8 +869,7 @@ export default function TradeMarketPage() {
 							</Button>
 						</div>
 
-
-				<div className="flex items-center gap-2">
+						<div className="flex items-center gap-2">
 							{maxPage > 1 && (
 								<div className="flex items-center gap-0.5 ml-1">
 									<Button
@@ -378,35 +895,33 @@ export default function TradeMarketPage() {
 									</Button>
 								</div>
 							)}
-					<Button
-						variant="outline"
-						size="sm"
+							<Button
+								variant="outline"
+								size="sm"
 								onClick={() =>
 									tab === "popular" ? fetch(true) : fetchListings(true)
 								}
 								disabled={tab === "popular" ? loading : loadingListings}
-					>
+							>
 								{loading || loadingListings ? (
-							<Loader2 className="animate-spin" />
-						) : (
-							<RefreshCw />
+									<Loader2 className="animate-spin" />
+								) : (
+									<RefreshCw />
 								)}
-					</Button>
-
-				</div>
+							</Button>
+						</div>
 					</div>
-
-			</div>
-
-			{error && (
-				<div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-					{error}
 				</div>
-			)}
 
-				<Table>
+				{error && (
+					<div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+						{error}
+					</div>
+				)}
+
+				<Table className="[&_tbody_td]:py-4">
 					<TableHeader>
-								<TableRow>
+						<TableRow>
 							<TableHead>
 								<button
 									type="button"
@@ -417,7 +932,7 @@ export default function TradeMarketPage() {
 									<SortIcon column="name" />
 								</button>
 							</TableHead>
-									<TableHead className="text-right">
+							<TableHead className="text-right">
 								<button
 									type="button"
 									className="ml-auto flex items-center justify-end hover:text-foreground"
@@ -426,9 +941,9 @@ export default function TradeMarketPage() {
 									{isRankingData ? "Lowest" : "Price"}
 									<SortIcon column={isRankingData ? "lowest" : "price"} />
 								</button>
-									</TableHead>
-									{isRankingData && (
-										<>
+							</TableHead>
+							{isRankingData && (
+								<>
 									<TableHead className="text-right">
 										<button
 											type="button"
@@ -449,9 +964,9 @@ export default function TradeMarketPage() {
 											<SortIcon column="quantity" />
 										</button>
 									</TableHead>
-										</>
-									)}
-									{!isRankingData && (
+								</>
+							)}
+							{!isRankingData && (
 								<TableHead className="text-right">
 									<button
 										type="button"
@@ -462,7 +977,7 @@ export default function TradeMarketPage() {
 										<SortIcon column="listed" />
 									</button>
 								</TableHead>
-									)}
+							)}
 						</TableRow>
 					</TableHeader>
 					<TableBody>
@@ -470,143 +985,164 @@ export default function TradeMarketPage() {
 							Array.from({ length: pageSize }).map((_, i) => (
 								<TableRow key={i}>
 									<TableCell>
-										<Skeleton className="h-10 w-full rounded-md" />
+										<Skeleton className="h-14 w-full rounded-md" />
 									</TableCell>
 									<TableCell>
-										<Skeleton className="h-10 w-full rounded-md" />
+										<Skeleton className="h-14 w-full rounded-md" />
 									</TableCell>
 									<TableCell>
-										<Skeleton className="h-10 w-full rounded-md" />
+										<Skeleton className="h-14 w-full rounded-md" />
 									</TableCell>
 									<TableCell>
-										<Skeleton className="h-10 w-full rounded-md" />
+										<Skeleton className="h-14 w-full rounded-md" />
 									</TableCell>
 								</TableRow>
 							))
 						) : pageItems.length > 0 ? (
-							isRankingData
-									? pageItems.map((entry) => {
-										const m = entry as MergedPopularEntry;
-										const { wynn, wynnInv } = m.completedData;
-										const raw = wynn?.rarity ?? "";
-										const rarity = raw
-											? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
-											: "";
-										const { text } = getRarityStyles(rarity);
-										return (
-											<TableRow
-												key={m.name + m.tier}
-												className="group cursor-pointer"
-												onClick={() => {
-													router.push(
-														`/trademarket/${encodeURIComponent(m.name)}${m.tier != null ? `?tier=${m.tier}` : ""}`,
-													);
-												}}
+							isRankingData ? (
+								pageItems.map((entry) => {
+									const m = entry as MergedPopularEntry;
+									const { wynn, wynnInv } = m.completedData;
+									const raw = wynn?.rarity ?? "";
+									const rarity = raw
+										? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+										: "";
+									const { text } = getRarityStyles(rarity);
+									return (
+										<TableRow
+											key={m.name + m.tier}
+											className="group cursor-pointer"
+											onClick={() => {
+												router.push(
+													`/trademarket/${encodeURIComponent(m.name)}${m.tier != null ? `?tier=${m.tier}` : ""}`,
+												);
+											}}
+										>
+											<TableCell
+												className={cn("flex items-center gap-2 font-sans")}
 											>
-												<TableCell className={cn("flex items-center gap-2 font-sans")}>
-													<ItemIcon item={wynn ?? m.name} alt={m.name} />
-													<div className="min-w-0">
-														<span className={cn("text-lg font-medium group-hover:underline")}>
-															{m.name}
-															{m.tier ? ` ${tierRoman(m.tier)}` : ""}
-														</span>
-														{wynn && (
-															<div
-																className={cn(
-																	"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
-																	text,
-																)}
-															>
-																{[
-																	wynn.requirements?.level != null &&
-																	`Lv.${wynn.requirements.level}`,
-																	rarity,
-																	getItemTypeDisplay(wynn),
-																]
-																	.filter(Boolean)
-																	.map((s, i) => (
-																		<span key={i}>{s}</span>
-																	))}
-															</div>
+												<ItemIcon
+													item={wynn ?? m.name}
+													alt={m.name}
+													className="size-12"
+												/>
+												<div className="min-w-0">
+													<span
+														className={cn(
+															"text-lg font-medium group-hover:underline",
 														)}
-													</div>
-
-												</TableCell>
-												<TableCell className="text-right font-mono">
-													<EmeraldPrice price={wynnInv.lowest_price} size="lg" />
-												</TableCell>
-												<TableCell className="text-right font-mono">
-													<EmeraldPrice price={wynnInv.average_price} size="lg" />
-												</TableCell>
-												<TableCell className="text-right text-lg tabular-nums font-mono">
-													{wynnInv.total_count.toLocaleString()}
-												</TableCell>
-											</TableRow>
-										);
-									})
-									: pageItems.map((entry) => {
-										const m = entry as MergedNewlyListedEntry;
-										const { wynn, wynnInv } = m.completedData;
-										const raw = wynn?.rarity ?? wynnInv.listing?.rarity ?? "";
-										const rarity = raw
-											? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
-											: "";
-										const { text } = getRarityStyles(rarity);
-										return (
-											<TableRow
-												key={m.name + m.tier + wynnInv.timestamp}
-												className="group cursor-pointer"
-												onClick={() => {
-													router.push(
-														`/trademarket/${encodeURIComponent(m.name)}${m.tier != null ? `?tier=${m.tier}` : ""}`,
-													);
-												}}
+													>
+														{m.name}
+														{m.tier ? ` ${tierRoman(m.tier)}` : ""}
+													</span>
+													{wynn && (
+														<div
+															className={cn(
+																"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
+																text,
+															)}
+														>
+															{[
+																wynn.requirements?.level != null &&
+																	`Lv.${wynn.requirements.level}`,
+																rarity,
+																getItemTypeDisplay(wynn),
+															]
+																.filter(Boolean)
+																.map((s, i) => (
+																	<span key={i}>{s}</span>
+																))}
+														</div>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="text-right font-mono">
+												<EmeraldPrice price={wynnInv.lowest_price} size="lg" />
+											</TableCell>
+											<TableCell className="text-right font-mono">
+												<EmeraldPrice price={wynnInv.average_price} size="lg" />
+											</TableCell>
+											<TableCell className="text-right text-lg tabular-nums font-mono">
+												{wynnInv.total_count.toLocaleString()}
+											</TableCell>
+										</TableRow>
+									);
+								})
+							) : (
+								pageItems.map((entry) => {
+									const m = entry as MergedNewlyListedEntry;
+									const { wynn, wynnInv } = m.completedData;
+									const raw = wynn?.rarity ?? wynnInv.listing?.rarity ?? "";
+									const rarity = raw
+										? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+										: "";
+									const { text } = getRarityStyles(rarity);
+									return (
+										<TableRow
+											key={m.name + m.tier + wynnInv.timestamp}
+											className="group cursor-pointer"
+											onClick={() => {
+												router.push(
+													`/trademarket/${encodeURIComponent(m.name)}${m.tier != null ? `?tier=${m.tier}` : ""}`,
+												);
+											}}
+										>
+											<TableCell
+												className={cn("flex items-center gap-2 font-sans")}
 											>
-												<TableCell className={cn("flex items-center gap-2 font-sans")}>
-													<ItemIcon
-														item={
-															wynn ??
-															(typeof wynnInv.listing.icon?.value === "string"
-																? wynnInv.listing.icon.value
-																: m.name)
-														}
-														alt={m.name}
-													/>
-													<div className="min-w-0">
-														<span className={cn("text-lg font-medium group-hover:underline")}>
-															{m.name}
-															{m.tier ? ` ${tierRoman(m.tier)}` : ""}
-														</span>
-														{(wynn || wynnInv.listing) && (
-															<div
-																className={cn(
-																	"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
-																	text,
-																)}
-															>
-																{[
-																	wynn?.requirements?.level != null &&
-																	`Lv.${wynn.requirements.level}`,
-																	rarity,
-																	getItemTypeDisplay(wynn ?? undefined),
-																]
-																	.filter(Boolean)
-																	.map((s, i) => (
-																		<span key={i}>{s}</span>
-																	))}
-															</div>
+												<ItemIcon
+													item={
+														wynn ??
+														(typeof wynnInv.listing.icon?.value === "string"
+															? wynnInv.listing.icon.value
+															: m.name)
+													}
+													alt={m.name}
+													className="size-12"
+												/>
+												<div className="min-w-0">
+													<span
+														className={cn(
+															"text-lg font-medium group-hover:underline",
 														)}
-													</div>
-												</TableCell>
-												<TableCell className="text-right font-mono">
-													<EmeraldPrice price={wynnInv.listing_price} size="lg" />
-												</TableCell>
-												<TableCell className="text-right text-muted-foreground text-sm">
-													{formatTimeElapsed(wynnInv.timestamp)}
-												</TableCell>
-											</TableRow>
-										);
-									})
+													>
+														{m.name}
+														{m.tier ? ` ${tierRoman(m.tier)}` : ""}
+													</span>
+													{(wynn || wynnInv.listing) && (
+														<div
+															className={cn(
+																"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
+																text,
+															)}
+														>
+															{[
+																wynn?.requirements?.level != null &&
+																	`Lv.${wynn.requirements.level}`,
+																rarity,
+																getItemTypeDisplay(wynn ?? undefined),
+															]
+																.filter(Boolean)
+																.map((s, i) => (
+																	<span key={i}>{s}</span>
+																))}
+														</div>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="text-right font-mono">
+												<EmeraldPrice price={wynnInv.listing_price} size="lg" />
+											</TableCell>
+											<TableCell
+												className="text-right text-muted-foreground text-sm"
+												suppressHydrationWarning
+											>
+												{formatTimeElapsed(wynnInv.timestamp)}
+											</TableCell>
+										</TableRow>
+									);
+								})
+							)
 						) : (
 							<TableRow>
 								<TableCell
@@ -621,11 +1157,9 @@ export default function TradeMarketPage() {
 				</Table>
 
 				{!loading && pageItems.length > 0 && (
-					<div className="flex items-center justify-center gap-2 pt-2 w-full">
-						<div className="gap-2 flex font-sans items-center ">
-							<p className="text-sm text-muted-foreground">
-								Limit:
-							</p>
+					<div className="flex items-center pt-2 w-full">
+						<div className="flex-1 shrink-0 min-w-0 items-center gap-2 font-sans flex">
+							<p className="text-sm text-muted-foreground">Limit:</p>
 							<Select
 								value={String(pageSize)}
 								onValueChange={(v) => setPageSize(Number(v))}
@@ -643,51 +1177,630 @@ export default function TradeMarketPage() {
 							</Select>
 						</div>
 
-						{maxPage > 1 && (
-							<>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => setPage((p) => Math.max(1, p - 1))}
-						disabled={page <= 1}
-					>
-						‹
-					</Button>
+						<div className="flex-1 flex items-center justify-center gap-2">
+							{maxPage > 1 && (
+								<>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setPage((p) => Math.max(1, p - 1))}
+										disabled={page <= 1}
+									>
+										‹
+									</Button>
 
-					{pageNumbers.map((p, i) =>
-						p === "ellipsis" ? (
-							<span
-								key={`e-${i}`}
-								className="flex size-8 items-center justify-center text-xs text-muted-foreground"
-							>
-								…
-							</span>
-						) : (
-							<Button
-								key={p}
-								variant={p === page ? "secondary" : "ghost"}
-								size="sm"
-								className="text-xs"
-								onClick={() => setPage(p)}
-							>
-								{p}
-							</Button>
-						),
-					)}
+									{pageNumbers.map((p, i) =>
+										p === "ellipsis" ? (
+											<span
+												key={`e-${i}`}
+												className="flex size-8 items-center justify-center text-xs text-muted-foreground"
+											>
+												…
+											</span>
+										) : (
+											<Button
+												key={p}
+												variant={p === page ? "secondary" : "ghost"}
+												size="sm"
+												className="text-xs"
+												onClick={() => setPage(p)}
+											>
+												{p}
+											</Button>
+										),
+									)}
 
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
-						disabled={page >= maxPage}
-					>
-						›
-					</Button>
-							</>
-						)}
-				</div>
-			)}
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
+										disabled={page >= maxPage}
+									>
+										›
+									</Button>
+								</>
+							)}
+						</div>
+
+						<div className="flex-1 shrink-0 min-w-0" aria-hidden />
+					</div>
+				)}
 			</div>
+
+			{metadata && (
+				<aside className="sticky top-20 w-full shrink-0 lg:w-80   lg:top-20">
+					<div className="flex flex-col gap-3 rounded-lg border border-border/50 p-3">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							{/* <div className="flex flex-wrap items-center gap-1.5">
+								{filterType && (
+									<Badge
+										variant="secondary"
+										className="cursor-pointer rounded-full px-2 py-0 text-[10px] font-normal"
+										onClick={() => setFilterType(null)}
+									>
+										Type:{" "}
+										{filterType === "MaterialItem"
+											? "Crafting Materials"
+											: filterType === "IngredientItem"
+												? "Crafting Ingredients"
+												: filterType === "DungeonKeyItem"
+													? "Keys"
+													: filterType === "MountItem"
+														? "Mount"
+														: filterType === "EnchanterItem"
+															? "Enchanter"
+															: filterType === "OtherItem"
+																? "Other"
+																: filterType}{" "}
+										×
+									</Badge>
+								)}
+								{Object.entries(filterAdvanced)
+									.filter(([k]) => k.toLowerCase() !== "attackspeed")
+									.map(([k, v]) => (
+										<Badge
+											key={k}
+											variant="secondary"
+											className="cursor-pointer rounded-full px-2 py-0 text-[10px] font-normal"
+											onClick={() =>
+												setFilterAdvanced((prev) => {
+													const next = { ...prev };
+													delete next[k];
+													return next;
+												})
+											}
+										>
+											{k}: {v} ×
+										</Badge>
+									))}
+								{filterTierItem && (
+									<Badge
+										variant="secondary"
+										className="cursor-pointer rounded-full px-2 py-0 text-[10px] font-normal"
+										onClick={() => setFilterTierItem(null)}
+									>
+										Rarity: {filterTierItem} ×
+									</Badge>
+								)}
+								{filterIngredientTier && (
+									<Badge
+										variant="secondary"
+										className="cursor-pointer rounded-full px-2 py-0 text-[10px] font-normal"
+										onClick={() => setFilterIngredientTier(null)}
+									>
+										Tier: {filterIngredientTier} ×
+									</Badge>
+								)}
+								{(filterLevelMin != null || filterLevelMax != null) && (
+									<Badge
+										variant="secondary"
+										className="cursor-pointer rounded-full px-2 py-0 text-[10px] font-normal"
+										onClick={() => {
+											setFilterLevelMin(null);
+											setFilterLevelMax(null);
+											setLevelMinInput("");
+											setLevelMaxInput("");
+										}}
+									>
+										Level: {filterLevelMin ?? "—"}–{filterLevelMax ?? "—"} ×
+									</Badge>
+								)}
+							</div> */}
+						</div>
+						<Collapsible
+							defaultOpen={false}
+							className="group rounded-md border border-border/40"
+						>
+							<CollapsibleTrigger className="flex h-10 w-full items-center font-sans justify-between gap-1.5 rounded-md px-3 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+								<span className="flex items-center gap-1.5 text-md">
+									Filters
+									{(filterLevelMin != null ||
+										filterLevelMax != null ||
+										filterTierItem ||
+										filterIngredientTier) && (
+										<Badge
+											variant="outline"
+											className="rounded-full px-1.5 py-0 text-[10px] font-normal capitalize pointer-events-none border-green-500/70 text-green-600 dark:text-green-400"
+										>
+											Active
+										</Badge>
+									)}
+								</span>
+								<ChevronDown
+									className="size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180"
+									aria-hidden
+								/>
+							</CollapsibleTrigger>
+							<CollapsibleContent>
+								<div className="flex flex-col gap-2 py-2 pl-2">
+									<div className="flex flex-col items-start gap-1.5">
+										<span className="text-sm font-medium  shrink-0">
+											Level Range:
+										</span>
+										<div className="flex flex-wrap items-center gap-2">
+											<Input
+												type="number"
+												placeholder="Min"
+												min={0}
+												max={metadata?.filters?.levelRange?.items ?? 110}
+												value={levelMinInput}
+												onChange={(e) => setLevelMinInput(e.target.value)}
+												className="h-8 w-20"
+											/>
+											<Input
+												type="number"
+												placeholder="Max"
+												min={0}
+												max={metadata?.filters?.levelRange?.items ?? 110}
+												value={levelMaxInput}
+												onChange={(e) => setLevelMaxInput(e.target.value)}
+												className="h-8 w-20"
+											/>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												className="h-8 w-8 p-0"
+												aria-label="Apply level filter"
+												onClick={() => {
+													const min = levelMinInput.trim()
+														? parseInt(levelMinInput, 10)
+														: null;
+													const max = levelMaxInput.trim()
+														? parseInt(levelMaxInput, 10)
+														: null;
+													setFilterLevelMin(
+														min != null && !Number.isNaN(min) ? min : null,
+													);
+													setFilterLevelMax(
+														max != null && !Number.isNaN(max) ? max : null,
+													);
+												}}
+											>
+												<Check className="size-4" />
+											</Button>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												className="h-8 w-8 p-0"
+												aria-label="Clear filters"
+												onClick={() => {
+													setLevelMinInput("");
+													setLevelMaxInput("");
+													setFilterLevelMin(null);
+													setFilterLevelMax(null);
+													setFilterTierItem(null);
+													setFilterIngredientTier(null);
+												}}
+											>
+												<X className="size-4" />
+											</Button>
+										</div>
+									</div>
+									{metadata.filters.tier?.items?.length > 0 && (
+										<div className="flex flex-col items-start gap-1.5">
+											<span className="text-sm font-medium shrink-0">
+												Rarity:
+											</span>
+											<div className="flex flex-1 flex-wrap items-center gap-1.5">
+												{metadata.filters.tier.items.map((v) => {
+													const isSelected = filterTierItem === v;
+													return (
+														<Button
+															key={v}
+															type="button"
+															variant={isSelected ? "default" : "outline"}
+															size="sm"
+															className={cn(
+																"h-7 text-sm capitalize",
+																isSelected && "bg-white text-black",
+															)}
+															onClick={() => {
+																setFilterTierItem(isSelected ? null : v);
+															}}
+														>
+															{v}
+														</Button>
+													);
+												})}
+											</div>
+										</div>
+									)}
+									{metadata.filters.tier?.ingredients?.length > 0 && (
+										<div className="flex flex-col items-start gap-1.5">
+											<span className="text-sm font-medium shrink-0">
+												Material/Ingredient Tier:
+											</span>
+											<div className="flex flex-1 flex-wrap items-center gap-1.5">
+												{metadata.filters.tier.ingredients.map((v) => {
+													const val = String(v);
+													const isSelected = filterIngredientTier === val;
+													return (
+														<Button
+															key={v}
+															type="button"
+															variant={isSelected ? "default" : "outline"}
+															size="sm"
+															className={cn(
+																"h-7 text-sm",
+																isSelected && "bg-white text-black",
+															)}
+															onClick={() => {
+																setFilterIngredientTier(
+																	isSelected ? null : val,
+																);
+															}}
+														>
+															Tier {v}
+														</Button>
+													);
+												})}
+											</div>
+										</div>
+									)}
+								</div>
+							</CollapsibleContent>
+						</Collapsible>
+						<div className="flex flex-col gap-2">
+							<Collapsible
+								defaultOpen
+								className="group rounded-md border border-border/40"
+							>
+								<CollapsibleTrigger className="flex h-10 w-full items-center justify-between font-sans gap-1.5 rounded-md px-3 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+									<span className="text-md">Browse by Category</span>
+									<ChevronDown
+										className="size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180"
+										aria-hidden
+									/>
+								</CollapsibleTrigger>
+								<CollapsibleContent>
+									<div className="flex flex-col gap-2 py-2 pl-2">
+										<Button
+											type="button"
+											variant={
+												filterType === "gearItem" ? "default" : "outline"
+											}
+											size="sm"
+											className={cn(
+												"w-full justify-start text-sm h-10",
+												filterType === "gearItem" && "bg-white text-black ",
+											)}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFilterType(
+													filterType === "gearItem" ? null : "gearItem",
+												);
+												setFilterAdvanced({});
+											}}
+										>
+											All Categories
+										</Button>
+										{metadata.filters.advanced &&
+											Object.entries(metadata.filters.advanced)
+												.filter(
+													([advKey]) =>
+														advKey.toLowerCase() !== "attackspeed" &&
+														advKey.toLowerCase() !== "tool" &&
+														advKey.toLowerCase() !== "crafting" &&
+														advKey.toLowerCase() !== "gathering" &&
+														advKey.toLowerCase() !== "tome",
+												)
+												.map(
+													([advKey, values]) =>
+														Array.isArray(values) &&
+														values.length > 0 && (
+															<Collapsible
+																key={advKey}
+																defaultOpen={false}
+																className="group/cat rounded-md border border-border/40"
+															>
+																<CollapsibleTrigger
+																	className={cn(
+																		"flex h-10 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-white/5 px-3 text-left text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+																		filterType === advKey ||
+																			filterAdvanced[advKey]
+																			? "group-data-[state=closed]/cat:border-transparent group-data-[state=closed]/cat:bg-white group-data-[state=closed]/cat:text-black group-data-[state=closed]/cat:hover:bg-white group-data-[state=closed]/cat:hover:text-black"
+																			: " ",
+																	)}
+																>
+																	<span className="capitalize">{advKey}</span>
+																	<ChevronDown
+																		className="size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/cat:rotate-180"
+																		aria-hidden
+																	/>
+																</CollapsibleTrigger>
+																<CollapsibleContent>
+																	<div className="flex flex-col w-full items-center gap-1.5 py-2 pl-2">
+																		{metadata.filters.type?.includes(
+																			advKey,
+																		) && (
+																			<Button
+																				type="button"
+																				variant={
+																					filterType === advKey
+																						? "default"
+																						: "ghost"
+																				}
+																				size="sm"
+																				className={cn(
+																					" h-10 justify-start w-full text-sm",
+																					filterType === advKey &&
+																						"bg-white text-black",
+																				)}
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					setFilterType(
+																						filterType === advKey
+																							? null
+																							: advKey,
+																					);
+																					setFilterAdvanced({});
+																				}}
+																			>
+																				All
+																			</Button>
+																		)}
+																		{values.map((v) => {
+																			const isSelected =
+																				filterAdvanced[advKey] === v;
+																			return (
+																				<Button
+																					key={v}
+																					type="button"
+																					variant={
+																						isSelected ? "default" : "ghost"
+																					}
+																					size="sm"
+																					className={cn(
+																						" h-10 justify-start w-full text-sm capitalize",
+																						isSelected && "bg-white text-black",
+																					)}
+																					onClick={() => {
+																						if (isSelected) {
+																							setFilterAdvanced((prev) => {
+																								const next = { ...prev };
+																								delete next[advKey];
+																								return next;
+																							});
+																						} else {
+																							setFilterType(null);
+																							setFilterAdvanced({
+																								[advKey]: v,
+																							});
+																						}
+																					}}
+																				>
+																					{v}
+																				</Button>
+																			);
+																		})}
+																	</div>
+																</CollapsibleContent>
+															</Collapsible>
+														),
+												)}
+										<Button
+											type="button"
+											variant={
+												filterType === "MaterialItem" ? "default" : "outline"
+											}
+											size="sm"
+											className={cn(
+												"w-full justify-start text-sm h-10",
+												filterType === "MaterialItem" && "bg-white text-black ",
+											)}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFilterType(
+													filterType === "MaterialItem" ? null : "MaterialItem",
+												);
+												setFilterAdvanced({});
+											}}
+										>
+											Crafting Materials
+										</Button>
+										<Button
+											type="button"
+											variant={
+												filterType === "IngredientItem" ? "default" : "outline"
+											}
+											size="sm"
+											className={cn(
+												"w-full justify-start text-sm h-10",
+												filterType === "IngredientItem" &&
+													"bg-white text-black ",
+											)}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFilterType(
+													filterType === "IngredientItem"
+														? null
+														: "IngredientItem",
+												);
+												setFilterAdvanced({});
+											}}
+										>
+											Crafting Ingredients
+										</Button>
+										<Button
+											type="button"
+											variant={
+												filterType === "MountItem" ? "default" : "outline"
+											}
+											size="sm"
+											className={cn(
+												"w-full justify-start text-sm h-10",
+												filterType === "MountItem" && "bg-white text-black ",
+											)}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFilterType(
+													filterType === "MountItem" ? null : "MountItem",
+												);
+												setFilterAdvanced({});
+											}}
+										>
+											Mount
+										</Button>
+										<Button
+											type="button"
+											variant={
+												filterType === "EnchanterItem" ? "default" : "outline"
+											}
+											size="sm"
+											className={cn(
+												"w-full justify-start text-sm h-10",
+												filterType === "EnchanterItem" &&
+													"bg-white text-black ",
+											)}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFilterType(
+													filterType === "EnchanterItem"
+														? null
+														: "EnchanterItem",
+												);
+												setFilterAdvanced({});
+											}}
+										>
+											Enchanter
+										</Button>
+										<Button
+											type="button"
+											variant={
+												filterType === "OtherItem" ? "default" : "outline"
+											}
+											size="sm"
+											className={cn(
+												"w-full justify-start text-sm h-10",
+												filterType === "OtherItem" && "bg-white text-black ",
+											)}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFilterType(
+													filterType === "OtherItem" ? null : "OtherItem",
+												);
+												setFilterAdvanced({});
+											}}
+										>
+											Other
+										</Button>
+										<Button
+											type="button"
+											variant={
+												filterType === "DungeonKeyItem" ? "default" : "outline"
+											}
+											size="sm"
+											className={cn(
+												"w-full justify-start text-sm h-10",
+												filterType === "DungeonKeyItem" &&
+													"bg-white text-black ",
+											)}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFilterType(
+													filterType === "DungeonKeyItem"
+														? null
+														: "DungeonKeyItem",
+												);
+												setFilterAdvanced({});
+											}}
+										>
+											Key
+										</Button>
+									</div>
+								</CollapsibleContent>
+							</Collapsible>
+
+							{/* {metadata.filters.identifications?.length > 0 && (
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="text-[10px] text-muted-foreground shrink-0">
+										identifications:
+									</span>
+									{metadata.filters.identifications.slice(0, 20).map((v) => (
+										<Badge
+											key={v}
+											variant="outline"
+											className="rounded-full px-2 py-0 text-[10px] font-normal"
+										>
+											{v}
+										</Badge>
+									))}
+									{metadata.filters.identifications.length > 20 && (
+										<Badge
+											variant="outline"
+											className="rounded-full px-2 py-0 text-[10px] font-normal"
+										>
+											+{metadata.filters.identifications.length - 20} more
+										</Badge>
+									)}
+								</div>
+							)}
+							{metadata.majorIds?.length > 0 && (
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="text-[10px] text-muted-foreground shrink-0">
+										majorIds:
+									</span>
+									{metadata.majorIds.slice(0, 15).map((v) => (
+										<Badge
+											key={v}
+											variant="outline"
+											className="rounded-full px-2 py-0 text-[10px] font-normal"
+										>
+											{v}
+										</Badge>
+									))}
+									{metadata.majorIds.length > 15 && (
+										<Badge
+											variant="outline"
+											className="rounded-full px-2 py-0 text-[10px] font-normal"
+										>
+											+{metadata.majorIds.length - 15} more
+										</Badge>
+									)}
+								</div>
+							)}
+							{metadata.static && Object.keys(metadata.static).length > 0 && (
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="text-[10px] text-muted-foreground shrink-0">
+										static:
+									</span>
+									{Object.entries(metadata.static).map(([k, v]) => (
+										<Badge
+											key={k}
+											variant="outline"
+											className="rounded-full px-2 py-0 text-[10px] font-normal"
+										>
+											{k}: {v}
+										</Badge>
+									))}
+								</div>
+							)} */}
+						</div>
+					</div>
+				</aside>
+			)}
 		</div>
 	);
 }

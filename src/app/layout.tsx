@@ -35,7 +35,10 @@ export default function RootLayout({
 			lang="en"
 			className={`dark ${GeistSans.variable} ${GeistMono.variable} ${GeistPixelSquare.variable} ${GeistPixelGrid.variable} ${GeistPixelCircle.variable} ${GeistPixelTriangle.variable} ${GeistPixelLine.variable}`}
 		>
-			<body className="antialiased bg-background text-foreground font-sans select-none touch-manipulation">
+			<body
+				className="antialiased bg-background text-foreground font-sans select-none touch-manipulation"
+				suppressHydrationWarning
+			>
 				<DisableZoomHandler />
 				<Navbar />
 				{children}
