@@ -1,30 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn, tierRoman } from "@/lib/utils";
+import { getRarityStyles } from "@/lib/rarity-color";
 import { getItemDatabaseFull } from "@/api/item";
 import { getTradeListingsForItem } from "@/api/wynnventory/trademarket";
 import { ItemIcon } from "@/lib/item-icons";
-import { EmeraldPrice } from "@/components/emerald-price";
 import type { ItemDatabase } from "@/types/item";
 import type { TradeListing } from "@/types/wynnventory/trademarket";
 
-const DEBOUNCE_MS = 350;
-const MAX_RESULTS = 10;
-
-const TIER_ROMAN: Record<number, string> = { 0: "0", 1: "I", 2: "II", 3: "III" };
-
-const RARITY_COLORS: Record<string, string> = {
-	common: "text-gray-400",
-	unique: "text-yellow-300",
-	rare: "text-pink-400",
-	legendary: "text-cyan-300",
-	set: "text-green-400",
-	fabled: "text-red-400",
-	mythic: "text-purple-400",
-};
+const DEBOUNCE_MS = 200;
+const MAX_RESULTS = 50;
+const PAGE_SIZE = 50;
 
 interface ResultItem {
 	name: string;
@@ -52,14 +41,18 @@ export function ItemSearchInput({
 }: Props) {
 	const [db, setDb] = useState<ItemDatabase>({});
 	const [results, setResults] = useState<ResultItem[]>([]);
+	const [loading, setLoading] = useState(false);
 	const [open, setOpen] = useState(false);
 	const [activeIndex, setActiveIndex] = useState(-1);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const abortRef = useRef<AbortController | null>(null);
 
 	// Load full DB once for icon lookup
 	useEffect(() => {
-		getItemDatabaseFull().then(setDb).catch(() => {});
+		getItemDatabaseFull()
+			.then(setDb)
+			.catch(() => {});
 	}, []);
 
 	// Debounced search via trade listings endpoint
@@ -67,11 +60,17 @@ export function ItemSearchInput({
 		if (!value.trim()) {
 			setResults([]);
 			setOpen(false);
+			setLoading(false);
 			return;
 		}
 		const t = setTimeout(() => {
-			getTradeListingsForItem(value.trim(), { page_size: 100 })
+			abortRef.current?.abort();
+			abortRef.current = new AbortController();
+			const signal = abortRef.current.signal;
+			setLoading(true);
+			getTradeListingsForItem(value.trim(), { page_size: PAGE_SIZE })
 				.then((res) => {
+					if (signal.aborted) return;
 					// One entry per (name + tier), lowest price each
 					const seen = new Map<string, TradeListing>();
 					for (const item of res.items) {
@@ -95,11 +94,19 @@ export function ItemSearchInput({
 					setActiveIndex(-1);
 				})
 				.catch(() => {
-					setResults([]);
-					setOpen(false);
+					if (!signal.aborted) {
+						setResults([]);
+						setOpen(false);
+					}
+				})
+				.finally(() => {
+					if (!signal.aborted) setLoading(false);
 				});
 		}, DEBOUNCE_MS);
-		return () => clearTimeout(t);
+		return () => {
+			clearTimeout(t);
+			abortRef.current?.abort();
+		};
 	}, [value]);
 
 	// Close on outside click
@@ -155,15 +162,19 @@ export function ItemSearchInput({
 
 	return (
 		<div ref={containerRef} className={cn("relative", className)}>
-			<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" />
+			{loading ? (
+				<Loader2 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none z-10 animate-spin" />
+			) : (
+				<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" />
+			)}
 			<Input
 				ref={inputRef}
 				placeholder={placeholder}
 				value={value}
 				onChange={(e) => handleChange(e.target.value)}
 				onKeyDown={handleKeyDown}
-				onFocus={() => results.length > 0 && setOpen(true)}
-				className="pl-9 pr-8"
+				onFocus={() => (results.length > 0 || loading) && setOpen(true)}
+				className="pl-9 pr-8 "
 				autoComplete="off"
 			/>
 			{value && (
@@ -183,35 +194,62 @@ export function ItemSearchInput({
 				</button>
 			)}
 
-			{open && results.length > 0 && (
+			{open && (loading || results.length > 0) && (
 				<ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-					{results.map(({ name, listing }, i) => {
-						const rarity = listing.rarity?.toLowerCase();
-						const tier = listing.tier;
-						const listKey = `${name}__${tier ?? "null"}`;
-						return (
-							<li key={listKey}>
-								<button
-									type="button"
-									onMouseDown={(e) => {
-										e.preventDefault();
-										select(name, listing.tier);
-									}}
+					{loading && results.length === 0 ? (
+						<li className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+							<Loader2 className="size-4 animate-spin shrink-0" />
+							Searching...
+						</li>
+					) : (
+						results.map(({ name, listing }, i) => {
+							const rawRarity = listing.rarity ?? "";
+							const rarity =
+								rawRarity.charAt(0).toUpperCase() +
+								rawRarity.slice(1).toLowerCase();
+							const { border } = getRarityStyles(rarity);
+							const tier = listing.tier;
+							const listKey = `${name}__${tier ?? "null"}`;
+							return (
+								<li
+									key={listKey}
 									className={cn(
-										"flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
-										i === activeIndex
-											? "bg-accent text-accent-foreground"
-											: "hover:bg-accent/60",
+										i < results.length - 1 && "border-b border-border",
 									)}
 								>
-									<ItemIcon item={db[name] ?? name} alt={name} className="size-6 shrink-0" />
-									<span className="truncate flex-1">{name} {tier ? ` ${tierRoman(tier)}` : ""}</span>
-
-									<EmeraldPrice price={listing.listing_price} className="shrink-0 text-[10px]" />
-								</button>
-							</li>
-						);
-					})}
+									<button
+										type="button"
+										onMouseDown={(e) => {
+											e.preventDefault();
+											select(name, listing.tier);
+										}}
+										className={cn(
+											"flex h-full w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors",
+											i === activeIndex
+												? "bg-accent text-accent-foreground"
+												: "hover:bg-accent/60",
+										)}
+									>
+										<span
+											className={cn(
+												"flex shrink-0 overflow-hidden rounded border-2 p-1",
+												border.split(" ")[0],
+											)}
+										>
+											<ItemIcon
+												item={db[name] ?? name}
+												alt={name}
+												className="size-8"
+											/>
+										</span>
+										<span className="truncate flex-1 text-md ">
+											{name} {tier ? ` ${tierRoman(tier)}` : ""}
+										</span>
+									</button>
+								</li>
+							);
+						})
+					)}
 				</ul>
 			)}
 		</div>

@@ -809,35 +809,7 @@ export default function TradeMarketPage() {
 			{/* Main content */}
 			<div className="min-w-0 flex-1 space-y-4">
 				<div className="flex flex-col gap-3">
-					<div className="flex flex-wrap items-center gap-2">
-						<div className="flex rounded-lg border border-border/50 p-0.5">
-							<button
-								type="button"
-								onClick={() => setTab("popular")}
-								className={cn(
-									"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-									tab === "popular"
-										? "bg-primary text-primary-foreground"
-										: "text-muted-foreground hover:text-foreground",
-								)}
-							>
-								Popular
-							</button>
-							<button
-								type="button"
-								onClick={() => setTab("newly_listed")}
-								className={cn(
-									"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-									tab === "newly_listed"
-										? "bg-primary text-primary-foreground"
-										: "text-muted-foreground hover:text-foreground",
-								)}
-							>
-								Newly Listed
-							</button>
-						</div>
-					</div>
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<div className="flex flex-col gap-3">
 						<div className="flex items-center gap-2">
 							<ItemSearchInput
 								value={searchQuery}
@@ -854,7 +826,7 @@ export default function TradeMarketPage() {
 									setPage(1);
 								}}
 								onClear={() => setAppliedSearch("")}
-								className="flex-1 sm:max-w-lg"
+								className="flex-1 sm:max-w-2xl min-w-0"
 							/>
 							<Button
 								variant="outline"
@@ -869,46 +841,80 @@ export default function TradeMarketPage() {
 							</Button>
 						</div>
 
-						<div className="flex items-center gap-2">
-							{maxPage > 1 && (
-								<div className="flex items-center gap-0.5 ml-1">
-									<Button
-										variant="outline"
-										size="sm"
-										className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-										onClick={() => setPage((p) => Math.max(1, p - 1))}
-										disabled={page <= 1}
-									>
-										{"<"}
-									</Button>
-									<span className="text-sm text-muted-foreground tabular-nums px-2 text-center">
-										{page}/{maxPage}
-									</span>
-									<Button
-										variant="outline"
-										size="sm"
-										className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-										onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
-										disabled={page >= maxPage}
-									>
-										{">"}
-									</Button>
-								</div>
-							)}
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() =>
-									tab === "popular" ? fetch(true) : fetchListings(true)
-								}
-								disabled={tab === "popular" ? loading : loadingListings}
-							>
-								{loading || loadingListings ? (
-									<Loader2 className="animate-spin" />
-								) : (
-									<RefreshCw />
+						<div className="flex flex-1 flex-wrap items-center justify-between gap-2">
+							<div className="flex rounded-lg border border-border/50 p-0.5">
+								<button
+									type="button"
+									onClick={() => setTab("popular")}
+									className={cn(
+										"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+										tab === "popular"
+											? "bg-primary text-primary-foreground"
+											: "text-muted-foreground hover:text-foreground",
+									)}
+								>
+									Popular
+								</button>
+								<button
+									type="button"
+									onClick={() => setTab("newly_listed")}
+									className={cn(
+										"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+										tab === "newly_listed"
+											? "bg-primary text-primary-foreground"
+											: "text-muted-foreground hover:text-foreground",
+									)}
+								>
+									Newly Listed
+								</button>
+							</div>
+							<div className="flex items-center gap-2">
+								{maxPage > 1 && (
+									<div className="flex items-center gap-0.5">
+										<Button
+											variant="outline"
+											size="sm"
+											className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+											onClick={() => {
+												setPage((p) => Math.max(1, p - 1));
+												window.scrollTo({ top: 0, behavior: "smooth" });
+											}}
+											disabled={page <= 1}
+										>
+											{"<"}
+										</Button>
+										<span className="text-sm text-muted-foreground tabular-nums px-2 text-center">
+											{page}/{maxPage}
+										</span>
+										<Button
+											variant="outline"
+											size="sm"
+											className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+											onClick={() => {
+												setPage((p) => Math.min(maxPage, p + 1));
+												window.scrollTo({ top: 0, behavior: "smooth" });
+											}}
+											disabled={page >= maxPage}
+										>
+											{">"}
+										</Button>
+									</div>
 								)}
-							</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() =>
+										tab === "popular" ? fetch(true) : fetchListings(true)
+									}
+									disabled={tab === "popular" ? loading : loadingListings}
+								>
+									{loading || loadingListings ? (
+										<Loader2 className="animate-spin" />
+									) : (
+										<RefreshCw />
+									)}
+								</Button>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -1183,7 +1189,10 @@ export default function TradeMarketPage() {
 									<Button
 										variant="outline"
 										size="sm"
-										onClick={() => setPage((p) => Math.max(1, p - 1))}
+										onClick={() => {
+											setPage((p) => Math.max(1, p - 1));
+											window.scrollTo({ top: 0, behavior: "smooth" });
+										}}
 										disabled={page <= 1}
 									>
 										‹
@@ -1203,7 +1212,10 @@ export default function TradeMarketPage() {
 												variant={p === page ? "secondary" : "ghost"}
 												size="sm"
 												className="text-xs"
-												onClick={() => setPage(p)}
+												onClick={() => {
+													setPage(p);
+													window.scrollTo({ top: 0, behavior: "smooth" });
+												}}
 											>
 												{p}
 											</Button>
@@ -1213,7 +1225,10 @@ export default function TradeMarketPage() {
 									<Button
 										variant="outline"
 										size="sm"
-										onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
+										onClick={() => {
+											setPage((p) => Math.min(maxPage, p + 1));
+											window.scrollTo({ top: 0, behavior: "smooth" });
+										}}
 										disabled={page >= maxPage}
 									>
 										›
@@ -1228,8 +1243,8 @@ export default function TradeMarketPage() {
 			</div>
 
 			{metadata && (
-				<aside className="sticky top-20 w-full shrink-0 lg:w-80   lg:top-20">
-					<div className="flex flex-col gap-3 rounded-lg border border-border/50 p-3">
+				<aside className="sticky top-20 w-full shrink-0 lg:w-64   ">
+					<div className="flex flex-col gap-3">
 						<div className="flex flex-wrap items-center justify-between gap-2">
 							{/* <div className="flex flex-wrap items-center gap-1.5">
 								{filterType && (
