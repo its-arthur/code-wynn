@@ -296,11 +296,31 @@ export default function TradeMarketPage() {
 
 
 				<div className="flex items-center gap-2">
-							{!loading && !loadingListings && (
-						<p className="text-sm text-muted-foreground">
-									{total.toLocaleString()} items
-						</p>
-					)}
+							{maxPage > 1 && (
+								<div className="flex items-center gap-0.5 ml-1">
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+										onClick={() => setPage((p) => Math.max(1, p - 1))}
+										disabled={page <= 1}
+									>
+										{"<"}
+									</Button>
+									<span className="text-sm text-muted-foreground tabular-nums px-2 text-center">
+										{page}/{maxPage}
+									</span>
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+										onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
+										disabled={page >= maxPage}
+									>
+										{">"}
+									</Button>
+								</div>
+							)}
 					<Button
 						variant="outline"
 						size="sm"
@@ -313,11 +333,12 @@ export default function TradeMarketPage() {
 							<Loader2 className="animate-spin" />
 						) : (
 							<RefreshCw />
-						)}
-						Refresh
+								)}
 					</Button>
+
 				</div>
 					</div>
+
 			</div>
 
 			{error && (
@@ -484,7 +505,7 @@ export default function TradeMarketPage() {
 			)}
 
 			{!loading && maxPage > 1 && (
-				<div className="flex items-center justify-center gap-1 pt-2">
+					<div className="flex items-center justify-center gap-2 pt-2">
 					<Button
 						variant="outline"
 						size="sm"
@@ -523,6 +544,8 @@ export default function TradeMarketPage() {
 					>
 						›
 					</Button>
+
+
 				</div>
 			)}
 			</div>
