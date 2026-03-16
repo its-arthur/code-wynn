@@ -2,9 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Table,
 	TableBody,
@@ -25,7 +32,7 @@ import { EmeraldPrice } from "@/components/emerald-price";
 import { cn, tierRoman, formatTimeElapsed } from "@/lib/utils";
 import { getRarityStyles } from "@/lib/rarity-color";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 
 function getItemTypeDisplay(item: ItemEntry | undefined): string | undefined {
 	if (!item) return undefined;
@@ -139,9 +146,17 @@ export default function TradeMarketPage() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [appliedSearch, setAppliedSearch] = useState("");
 	const [page, setPage] = useState(1);
+	const [pageSize, setPageSize] = useState(50);
+	const [sortKey, setSortKey] = useState<"name" | "lowest" | "average" | "quantity" | "price" | "listed">("quantity");
+	const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 	useEffect(() => {
 		setPage(1);
+		setSortKey(tab === "popular" ? "quantity" : "listed");
+		setSortDir("desc");
 	}, [tab]);
+	useEffect(() => {
+		setPage(1);
+	}, [pageSize]);
 
 	useEffect(() => {
 		if (tab === "newly_listed") fetchListings();
@@ -212,13 +227,50 @@ export default function TradeMarketPage() {
 		tab === "popular" ? mergedPopular : mergedNewlyListed;
 	const isRankingData = tab === "popular";
 
-	useEffect(() => {
-		console.log("Trade market item data:", filtered);
-	}, [filtered]);
+	const sortedFiltered = useMemo(() => {
+		const arr = [...filtered];
+		const dir = sortDir === "asc" ? 1 : -1;
+		arr.sort((a, b) => {
+			if (sortKey === "name") {
+				const na = (a as MergedPopularEntry | MergedNewlyListedEntry).name.toLowerCase();
+				const nb = (b as MergedPopularEntry | MergedNewlyListedEntry).name.toLowerCase();
+				return dir * na.localeCompare(nb);
+			}
+			if (isRankingData) {
+				const ea = a as MergedPopularEntry;
+				const eb = b as MergedPopularEntry;
+				if (sortKey === "lowest") return dir * (ea.completedData.wynnInv.lowest_price - eb.completedData.wynnInv.lowest_price);
+				if (sortKey === "average") return dir * (ea.completedData.wynnInv.average_price - eb.completedData.wynnInv.average_price);
+				if (sortKey === "quantity") return dir * (ea.completedData.wynnInv.total_count - eb.completedData.wynnInv.total_count);
+			} else {
+				const ea = a as MergedNewlyListedEntry;
+				const eb = b as MergedNewlyListedEntry;
+				if (sortKey === "price") return dir * (ea.completedData.wynnInv.listing_price - eb.completedData.wynnInv.listing_price);
+				if (sortKey === "listed") return dir * (new Date(ea.completedData.wynnInv.timestamp).getTime() - new Date(eb.completedData.wynnInv.timestamp).getTime());
+			}
+			return 0;
+		});
+		return arr;
+	}, [filtered, sortKey, sortDir, isRankingData]);
 
-	const total = filtered.length;
-	const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-	const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+	const total = sortedFiltered.length;
+	const maxPage = Math.max(1, Math.ceil(total / pageSize));
+	const pageItems = sortedFiltered.slice((page - 1) * pageSize, page * pageSize);
+
+	function toggleSort(key: typeof sortKey) {
+		if (sortKey === key) {
+			setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+		} else {
+			setSortKey(key);
+			setSortDir(key === "name" ? "asc" : "desc");
+		}
+		setPage(1);
+	}
+
+	function SortIcon({ column }: { column: typeof sortKey }) {
+		if (sortKey !== column) return <ArrowUpDown className="ml-1 size-3.5 opacity-50" />;
+		return sortDir === "asc" ? <ArrowUp className="ml-1 size-3.5" /> : <ArrowDown className="ml-1 size-3.5" />;
+	}
 	const pageNumbers = useMemo(() => {
 		const pages: (number | "ellipsis")[] = [];
 		const delta = 2;
@@ -279,6 +331,11 @@ export default function TradeMarketPage() {
 										router.push(url);
 									}
 								}}
+								onEnterSubmit={(v) => {
+									setAppliedSearch(v.trim());
+									setPage(1);
+								}}
+								onClear={() => setAppliedSearch("")}
 								className="flex-1 sm:max-w-lg"
 							/>
 							<Button
@@ -347,33 +404,87 @@ export default function TradeMarketPage() {
 				</div>
 			)}
 
-				{loading || (tab === "newly_listed" && loadingListings) ? (
-				<div className="space-y-2">
-					{Array.from({ length: 15 }).map((_, i) => (
-						<Skeleton key={i} className="h-10 rounded-md" />
-					))}
-				</div>
-				) : pageItems.length > 0 ? (
 				<Table>
 					<TableHeader>
 								<TableRow>
-							<TableHead>Name</TableHead>
+							<TableHead>
+								<button
+									type="button"
+									className="flex items-center hover:text-foreground"
+									onClick={() => toggleSort("name")}
+								>
+									Name
+									<SortIcon column="name" />
+								</button>
+							</TableHead>
 									<TableHead className="text-right">
-										{isRankingData ? "Lowest" : "Price"}
+								<button
+									type="button"
+									className="ml-auto flex items-center justify-end hover:text-foreground"
+									onClick={() => toggleSort(isRankingData ? "lowest" : "price")}
+								>
+									{isRankingData ? "Lowest" : "Price"}
+									<SortIcon column={isRankingData ? "lowest" : "price"} />
+								</button>
 									</TableHead>
 									{isRankingData && (
 										<>
-											<TableHead className="text-right">Average</TableHead>
-											<TableHead className="w-24 text-right">Quantity</TableHead>
+									<TableHead className="text-right">
+										<button
+											type="button"
+											className="ml-auto flex items-center justify-end hover:text-foreground"
+											onClick={() => toggleSort("average")}
+										>
+											Average
+											<SortIcon column="average" />
+										</button>
+									</TableHead>
+									<TableHead className="w-24 text-right">
+										<button
+											type="button"
+											className="ml-auto flex items-center justify-end hover:text-foreground"
+											onClick={() => toggleSort("quantity")}
+										>
+											Quantity
+											<SortIcon column="quantity" />
+										</button>
+									</TableHead>
 										</>
 									)}
 									{!isRankingData && (
-										<TableHead className="text-right">Listed</TableHead>
+								<TableHead className="text-right">
+									<button
+										type="button"
+										className="ml-auto flex items-center justify-end hover:text-foreground"
+										onClick={() => toggleSort("listed")}
+									>
+										Listed
+										<SortIcon column="listed" />
+									</button>
+								</TableHead>
 									)}
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-								{isRankingData
+						{loading || (tab === "newly_listed" && loadingListings) ? (
+							Array.from({ length: pageSize }).map((_, i) => (
+								<TableRow key={i}>
+									<TableCell>
+										<Skeleton className="h-10 w-full rounded-md" />
+									</TableCell>
+									<TableCell>
+										<Skeleton className="h-10 w-full rounded-md" />
+									</TableCell>
+									<TableCell>
+										<Skeleton className="h-10 w-full rounded-md" />
+									</TableCell>
+									<TableCell>
+										<Skeleton className="h-10 w-full rounded-md" />
+									</TableCell>
+								</TableRow>
+							))
+						) : pageItems.length > 0 ? (
+							isRankingData
 									? pageItems.map((entry) => {
 										const m = entry as MergedPopularEntry;
 										const { wynn, wynnInv } = m.completedData;
@@ -495,17 +606,45 @@ export default function TradeMarketPage() {
 												</TableCell>
 											</TableRow>
 										);
-									})}
+									})
+						) : (
+							<TableRow>
+								<TableCell
+									colSpan={isRankingData ? 4 : 3}
+									className="py-20 text-center text-sm text-muted-foreground"
+								>
+									No items found.
+								</TableCell>
+							</TableRow>
+						)}
 					</TableBody>
 				</Table>
-			) : (
-				<p className="py-20 text-center text-sm text-muted-foreground">
-					No items found.
-				</p>
-			)}
 
-			{!loading && maxPage > 1 && (
-					<div className="flex items-center justify-center gap-2 pt-2">
+				{!loading && pageItems.length > 0 && (
+					<div className="flex items-center justify-center gap-2 pt-2 w-full">
+						<div className="gap-2 flex font-sans items-center ">
+							<p className="text-sm text-muted-foreground">
+								Limit:
+							</p>
+							<Select
+								value={String(pageSize)}
+								onValueChange={(v) => setPageSize(Number(v))}
+							>
+								<SelectTrigger size="sm" className="h-8 w-[80px]">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{PAGE_SIZE_OPTIONS.map((n) => (
+										<SelectItem key={n} value={String(n)}>
+											{n}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
+						{maxPage > 1 && (
+							<>
 					<Button
 						variant="outline"
 						size="sm"
@@ -544,8 +683,8 @@ export default function TradeMarketPage() {
 					>
 						›
 					</Button>
-
-
+							</>
+						)}
 				</div>
 			)}
 			</div>

@@ -35,6 +35,8 @@ interface Props {
 	value: string;
 	onChange: (value: string) => void;
 	onSelect: (name: string, tier?: number | null) => void;
+	onEnterSubmit?: (value: string) => void;
+	onClear?: () => void;
 	placeholder?: string;
 	className?: string;
 }
@@ -43,6 +45,8 @@ export function ItemSearchInput({
 	value,
 	onChange,
 	onSelect,
+	onEnterSubmit,
+	onClear,
 	placeholder = "Search items...",
 	className,
 }: Props) {
@@ -116,6 +120,18 @@ export function ItemSearchInput({
 	}
 
 	function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+		if (e.key === "Enter") {
+			if (open && activeIndex >= 0) {
+				e.preventDefault();
+				const r = results[activeIndex];
+				select(r.name, r.listing.tier);
+			} else if (onEnterSubmit) {
+				e.preventDefault();
+				onEnterSubmit(value);
+			}
+			setOpen(false);
+			return;
+		}
 		if (!open) return;
 		if (e.key === "ArrowDown") {
 			e.preventDefault();
@@ -123,10 +139,6 @@ export function ItemSearchInput({
 		} else if (e.key === "ArrowUp") {
 			e.preventDefault();
 			setActiveIndex((i) => Math.max(i - 1, 0));
-		} else if (e.key === "Enter" && activeIndex >= 0) {
-			e.preventDefault();
-			const r = results[activeIndex];
-			select(r.name, r.listing.tier);
 		} else if (e.key === "Escape") {
 			setOpen(false);
 		}
@@ -160,6 +172,7 @@ export function ItemSearchInput({
 					onClick={() => {
 						onChange("");
 						onSelect("", null);
+						onClear?.();
 						setResults([]);
 						setOpen(false);
 						inputRef.current?.focus();
