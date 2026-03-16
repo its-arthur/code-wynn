@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RegionCard } from "@/components/raidpool/region-card";
+import { getItemDatabaseFull } from "@/api/item";
 import {
 	getLootrunRewardsCurrent,
 	getLootrunRewardsGrouped,
 	getLootrunRewardsHistory,
 } from "@/api/wynnventory/lootpool";
+import type { ItemDatabase } from "@/types/item";
 import type {
 	LootrunRewardsResponse,
 	LootrunGroupedRegion,
@@ -28,6 +30,7 @@ function WeekLabel({ week, year }: { week: number; year: number }) {
 
 export default function LootpoolPage() {
 	const [tab, setTab] = useState("current");
+	const [itemDb, setItemDb] = useState<ItemDatabase>({});
 
 	const [current, setCurrent] = useState<LootrunRewardsResponse | null>(null);
 	const [grouped, setGrouped] = useState<LootrunGroupedRegion[] | null>(null);
@@ -36,6 +39,10 @@ export default function LootpoolPage() {
 	const [historyPage, setHistoryPage] = useState(1);
 	const [loading, setLoading] = useState<Record<string, boolean>>({});
 	const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+	useEffect(() => {
+		getItemDatabaseFull().then(setItemDb).catch(() => {});
+	}, []);
 
 	const setTabLoading = (key: string, val: boolean) =>
 		setLoading((p) => ({ ...p, [key]: val }));
@@ -138,6 +145,7 @@ export default function LootpoolPage() {
 									region={r.region}
 									timestamp={r.timestamp}
 									items={r.items}
+									itemDb={itemDb}
 								/>
 							))}
 						</div>
@@ -159,6 +167,7 @@ export default function LootpoolPage() {
 								region={r.region}
 								timestamp={r.timestamp}
 								groups={r.region_items}
+								itemDb={itemDb}
 							/>
 						))}
 					</div>
@@ -192,6 +201,7 @@ export default function LootpoolPage() {
 											region={r.region}
 											timestamp={r.timestamp}
 											items={r.items}
+											itemDb={itemDb}
 										/>
 									))}
 								</div>

@@ -97,6 +97,13 @@ export function wynnItemGuideUrl(iconName: string): string {
 	return wynnNextgenUrl("itemguide", "3.3", name);
 }
 
+/** Tome icon e.g. guild → https://cdn.wynncraft.com/nextgen/itemguide/3.3/tome.guild.webp */
+export function wynnTomeIconUrl(subtype: string): string {
+	const slug =
+		(subtype ?? "").trim().toLowerCase().replace(/\s+/g, "_") || "guild";
+	return wynnItemGuideUrl(`tome.${slug}`);
+}
+
 /** Dungeon icon; name has spaces and hyphens replaced with underscore (e.g. "Dark Manor" → dung/Dark_Manor.webp) */
 export function wynnDungeonIconUrl(
 	name: string,

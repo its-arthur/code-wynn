@@ -1,18 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+	Loader2,
+	RefreshCw,
+	Calendar,
+	ChevronLeft,
+	ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RegionCard } from "@/components/raidpool/region-card";
 import { GambitCard } from "@/components/raidpool/gambit-card";
+import { getItemDatabaseFull } from "@/api/item";
 import {
 	getRaidRewardsCurrent,
 	getRaidRewardsGrouped,
 	getRaidGambitsCurrent,
 	getRaidRewardsHistory,
 } from "@/api/wynnventory/raidpool";
+import type { ItemDatabase } from "@/types/item";
 import type {
 	RaidRewardsResponse,
 	RaidGroupedRegion,
@@ -31,6 +39,7 @@ function WeekLabel({ week, year }: { week: number; year: number }) {
 
 export default function RaidpoolPage() {
 	const [tab, setTab] = useState("current");
+	const [itemDb, setItemDb] = useState<ItemDatabase>({});
 
 	const [current, setCurrent] = useState<RaidRewardsResponse | null>(null);
 	const [grouped, setGrouped] = useState<RaidGroupedRegion[] | null>(null);
@@ -41,6 +50,12 @@ export default function RaidpoolPage() {
 	const [loading, setLoading] = useState<Record<string, boolean>>({});
 	const [errors, setErrors] = useState<Record<string, string | null>>({});
 
+	useEffect(() => {
+		getItemDatabaseFull()
+			.then(setItemDb)
+			.catch(() => {});
+	}, []);
+
 	const setTabLoading = (key: string, val: boolean) =>
 		setLoading((p) => ({ ...p, [key]: val }));
 	const setTabError = (key: string, val: string | null) =>
@@ -50,9 +65,15 @@ export default function RaidpoolPage() {
 		setTabLoading("current", true);
 		setTabError("current", null);
 		getRaidRewardsCurrent()
-			.then(setCurrent)
+			.then((data) => {
+				console.log("fetchCurrent", data);
+				setCurrent(data);
+			})
 			.catch((e) =>
-				setTabError("current", e instanceof Error ? e.message : "Failed to load"),
+				setTabError(
+					"current",
+					e instanceof Error ? e.message : "Failed to load",
+				),
 			)
 			.finally(() => setTabLoading("current", false));
 	}, []);
@@ -63,7 +84,10 @@ export default function RaidpoolPage() {
 		getRaidRewardsGrouped()
 			.then(setGrouped)
 			.catch((e) =>
-				setTabError("grouped", e instanceof Error ? e.message : "Failed to load"),
+				setTabError(
+					"grouped",
+					e instanceof Error ? e.message : "Failed to load",
+				),
 			)
 			.finally(() => setTabLoading("grouped", false));
 	}, []);
@@ -74,7 +98,10 @@ export default function RaidpoolPage() {
 		getRaidGambitsCurrent()
 			.then(setGambits)
 			.catch((e) =>
-				setTabError("gambits", e instanceof Error ? e.message : "Failed to load"),
+				setTabError(
+					"gambits",
+					e instanceof Error ? e.message : "Failed to load",
+				),
 			)
 			.finally(() => setTabLoading("gambits", false));
 	}, []);
@@ -88,7 +115,10 @@ export default function RaidpoolPage() {
 				setHistoryPage(data.page);
 			})
 			.catch((e) =>
-				setTabError("history", e instanceof Error ? e.message : "Failed to load"),
+				setTabError(
+					"history",
+					e instanceof Error ? e.message : "Failed to load",
+				),
 			)
 			.finally(() => setTabLoading("history", false));
 	}, []);
@@ -101,7 +131,15 @@ export default function RaidpoolPage() {
 	useEffect(() => {
 		if (tab === "grouped" && !grouped && !loading.grouped) fetchGrouped();
 		if (tab === "history" && !history && !loading.history) fetchHistory(1);
-	}, [tab, grouped, history, loading.grouped, loading.history, fetchGrouped, fetchHistory]);
+	}, [
+		tab,
+		grouped,
+		history,
+		loading.grouped,
+		loading.history,
+		fetchGrouped,
+		fetchHistory,
+	]);
 
 	const refreshTab = () => {
 		if (tab === "current") fetchCurrent();
@@ -131,11 +169,7 @@ export default function RaidpoolPage() {
 					onClick={refreshTab}
 					disabled={!!isLoading}
 				>
-					{isLoading ? (
-						<Loader2 className="animate-spin" />
-					) : (
-						<RefreshCw />
-					)}
+					{isLoading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
 					Refresh
 				</Button>
 			</div>
@@ -177,6 +211,7 @@ export default function RaidpoolPage() {
 								region={r.region}
 								timestamp={r.timestamp}
 								groups={r.group_items}
+								itemDb={itemDb}
 							/>
 						))}
 					</div>
@@ -192,10 +227,7 @@ export default function RaidpoolPage() {
 				) : gambits ? (
 					<>
 						<div className="flex items-center gap-3">
-							<WeekLabel
-								week={0}
-								year={gambits.year}
-							/>
+							<WeekLabel week={0} year={gambits.year} />
 							<span className="text-xs text-muted-foreground">
 								Day {gambits.day}, Month {gambits.month}
 							</span>
@@ -236,6 +268,7 @@ export default function RaidpoolPage() {
 											region={r.region}
 											timestamp={r.timestamp}
 											items={r.items}
+											itemDb={itemDb}
 										/>
 									))}
 								</div>

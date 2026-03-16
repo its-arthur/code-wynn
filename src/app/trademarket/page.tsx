@@ -50,6 +50,7 @@ import { EmeraldPrice } from "@/components/emerald-price";
 import { Input } from "@/components/ui/input";
 import { cn, tierRoman, formatTimeElapsed } from "@/lib/utils";
 import { getRarityStyles } from "@/lib/rarity-color";
+import { resolveWynnData } from "@/lib/resolve-wynn-item";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 
@@ -137,187 +138,6 @@ function itemMatchesAdvancedFilter(
 }
 
 const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute
-
-/** Look up Wynncraft item by name, trying name + tier variants when tier is set */
-function getWynnItem(
-	itemDb: Record<string, ItemEntry>,
-	name: string,
-	tier: number | null,
-): ItemEntry | undefined {
-	const direct = itemDb[name];
-	if (direct) return direct;
-	if (tier != null) {
-		const withTierNum = itemDb[`${name} ${tier}`];
-		if (withTierNum) return withTierNum;
-		const withTierRoman = itemDb[`${name} ${tierRoman(tier)}`];
-		if (withTierRoman) return withTierRoman;
-	}
-	return undefined;
-}
-
-const POWDER_TYPES = ["fire", "water", "air", "thunder", "earth"];
-const CORKIAN_TYPES = ["amplifier", "insulator", "simulator"];
-
-/** Detect enchanter subtype: rune, powder, or corkian (keys are separate type) */
-function getEnchanterSubType(
-	name: string,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): "rune" | "powder" | "corkian" | null {
-	const n = name.toLowerCase();
-	const itemType =
-		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
-
-	if (n.includes("rune") || itemType.includes("rune")) return "rune";
-
-	for (const p of POWDER_TYPES) {
-		if (n.startsWith(p) || n.includes(` ${p} `) || n === `${p} powder`)
-			return "powder";
-	}
-	if (n.includes("powder") || itemType.includes("powder")) return "powder";
-
-	if (n.includes("corkian")) return "corkian";
-	for (const c of CORKIAN_TYPES) {
-		if (n.includes(c)) return "corkian";
-	}
-
-	return null;
-}
-
-/** Detect if item is rune, powder, or corkian (not in Wynncraft item DB) */
-function isEnchanterItem(
-	name: string,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): boolean {
-	return getEnchanterSubType(name, wynnInv) != null;
-}
-
-/** Create mock wynn{} for runes, powders, corkian – type: enchanter, subType: rune|powder|corkian */
-function createMockWynnForEnchanterItem(
-	name: string,
-	tier: number | null,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): ItemEntry {
-	const subType = getEnchanterSubType(name, wynnInv) ?? "rune";
-	const rarity = wynnInv?.rarity ?? "common";
-	return {
-		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
-		type: "enchanter",
-		subType: subType.charAt(0).toUpperCase() + subType.slice(1),
-		rarity,
-	};
-}
-
-/** Detect if item is a dungeon key – not in Wynncraft item DB */
-function isKeyItem(
-	name: string,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): boolean {
-	const n = name.toLowerCase();
-	const itemType =
-		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
-	return n.includes("key") || itemType.includes("key");
-}
-
-/** Create mock wynn{} for keys – type: key, subType: Dungeon Key */
-function createMockWynnForKeyItem(
-	name: string,
-	tier: number | null,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): ItemEntry {
-	const rarity = wynnInv?.rarity ?? "common";
-	return {
-		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
-		type: "key",
-		subType: "Dungeon Key",
-		rarity,
-	};
-}
-
-/** Detect if item is a mount (horse) – not in Wynncraft item DB */
-function isMountItem(
-	name: string,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): boolean {
-	const n = name.toLowerCase();
-	const itemType =
-		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
-	return (
-		n.includes("horse") ||
-		n.includes("mount") ||
-		itemType.includes("horse") ||
-		itemType.includes("mount")
-	);
-}
-
-/** Create mock wynn{} for mounts – type: Mounts, subType: Horse */
-function createMockWynnForMountItem(
-	name: string,
-	tier: number | null,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): ItemEntry {
-	const rarity = wynnInv?.rarity ?? "common";
-	return {
-		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
-		type: "Mounts",
-		subType: "Horse",
-		rarity,
-	};
-}
-
-/** Detect if item is emerald pouch – not in Wynncraft item DB */
-function isEmeraldPouchItem(
-	name: string,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): boolean {
-	const n = name.toLowerCase().replace(/\s/g, "");
-	const itemType =
-		wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
-	return (
-		n.includes("emeraldpouch") ||
-		(n.includes("emerald") && n.includes("pouch")) ||
-		itemType.includes("emeraldpouch") ||
-		(itemType.includes("emerald") && itemType.includes("pouch"))
-	);
-}
-
-/** Create mock wynn{} for emerald pouch – type: Other, subType: Emeraldpouch */
-function createMockWynnForEmeraldPouchItem(
-	name: string,
-	tier: number | null,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): ItemEntry {
-	const rarity = wynnInv?.rarity ?? "common";
-	return {
-		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
-		type: "Emeraldpouch",
-		subType: "Other",
-		rarity,
-	};
-}
-
-/** Resolve wynn data: real from itemDb, or mock for key/enchanter/mount/other items */
-function resolveWynnData(
-	itemDb: Record<string, ItemEntry>,
-	name: string,
-	tier: number | null,
-	wynnInv?: { item_type?: string; type?: string; rarity?: string },
-): ItemEntry | undefined {
-	const wynn = getWynnItem(itemDb, name, tier);
-	if (wynn) return wynn;
-	if (isKeyItem(name, wynnInv)) {
-		return createMockWynnForKeyItem(name, tier, wynnInv);
-	}
-	if (isEnchanterItem(name, wynnInv)) {
-		return createMockWynnForEnchanterItem(name, tier, wynnInv);
-	}
-	if (isMountItem(name, wynnInv)) {
-		return createMockWynnForMountItem(name, tier, wynnInv);
-	}
-	if (isEmeraldPouchItem(name, wynnInv)) {
-		return createMockWynnForEmeraldPouchItem(name, tier, wynnInv);
-	}
-	return undefined;
-}
 
 export default function TradeMarketPage() {
 	const router = useRouter();
@@ -433,7 +253,9 @@ export default function TradeMarketPage() {
 					const type = wynn?.type?.toLowerCase() ?? "";
 					const subType = wynn?.subType?.toLowerCase() ?? "";
 					return (
-						type === "other" || subType === "other" || type === "emeraldpouch"
+						type === "other" ||
+						subType === "other" ||
+						type === "emeraldpouch"
 					);
 				});
 			} else {
@@ -826,7 +648,7 @@ export default function TradeMarketPage() {
 									setPage(1);
 								}}
 								onClear={() => setAppliedSearch("")}
-								className="flex-1 sm:max-w-2xl min-w-0"
+								className="flex-1 min-w-0"
 							/>
 							<Button
 								variant="outline"

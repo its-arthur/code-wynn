@@ -7,7 +7,7 @@ import { Home, Package, Swords, Coins, Store } from "lucide-react";
 
 const navItems = [
 	{ href: "/", label: "Home", icon: Home },
-	{ href: "/items", label: "Items", icon: Package },
+	// { href: "/items", label: "Items", icon: Package },
 	{ href: "/raidpool", label: "Raids", icon: Swords },
 	{ href: "/lootpool", label: "Lootpool", icon: Coins },
 	{ href: "/trademarket", label: "Market", icon: Store },
@@ -28,8 +28,8 @@ export function Navbar() {
 	};
 
 	return (
-		<header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
-			<nav className="mx-auto flex h-14 max-w-6xl items-center gap-1 px-4">
+		<header className="sticky top-0 z-50 w-full border-b border-border/40 bg-gradient-to-b from-background/80 via-transparent to-transparent backdrop-blur-md">
+			<nav className="mx-auto flex h-14 max-w-6xl items-center justify-center gap-1 px-4">
 				{navItems.map(({ href, label, icon: Icon }) => {
 					const active = isActive(href);
 					return (

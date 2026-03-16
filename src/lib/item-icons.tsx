@@ -1,5 +1,5 @@
 import { ItemEntry } from "@/types/item";
-import { wynnItemGuideUrl } from "@/lib/wynn-cdn";
+import { wynnItemGuideUrl, wynnTomeIconUrl } from "@/lib/wynn-cdn";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -14,6 +14,51 @@ const RUNE_ICONS: Record<string, string> = {
 };
 
 const KEY_ICON = "/key.png";
+
+/** Emerald subType → icon from /currentcy */
+const EMERALD_ICONS: Record<string, string> = {
+	emerald: "/currentcy/em.webp",
+	emeraldpouch: "/currentcy/em.webp", // pouch uses emerald icon or we could add one
+	block: "/currentcy/eb.webp",
+	liquid: "/currentcy/le.webp",
+	stacks: "/currentcy/stk.webp",
+};
+
+function getEmeraldIconPath(item: ItemEntry | string): string | null {
+	if (typeof item === "string") {
+		const n = item.toLowerCase().replace(/\s/g, "");
+		if (!n.includes("emerald")) return null;
+		if (n.includes("stacks") || n.includes("stk")) return EMERALD_ICONS.stacks;
+		if (n.includes("liquid") || n.includes("le")) return EMERALD_ICONS.liquid;
+		if (n.includes("block") || n.includes("eb")) return EMERALD_ICONS.block;
+		if (n.includes("pouch")) return EMERALD_ICONS.emeraldpouch;
+		return EMERALD_ICONS.emerald;
+	}
+	// ItemEntry with type Other and subType (Emeraldpouch, Emerald, Block, Liquid, Stacks)
+	const type = item.type?.toLowerCase() ?? "";
+	const subType = item.subType?.toLowerCase() ?? "";
+	if (type !== "other") return null;
+	// Map subType to icon key
+	if (subType === "stacks") return EMERALD_ICONS.stacks;
+	if (subType === "liquid") return EMERALD_ICONS.liquid;
+	if (subType === "block") return EMERALD_ICONS.block;
+	if (subType === "emeraldpouch") return EMERALD_ICONS.emeraldpouch;
+	if (subType === "emerald") return EMERALD_ICONS.emerald;
+	return EMERALD_ICONS.emerald; // default
+}
+
+function isEmeraldItem(item: ItemEntry | string): boolean {
+	if (typeof item === "string") {
+		return item.toLowerCase().includes("emerald");
+	}
+	return (
+		item.type?.toLowerCase() === "other" &&
+		(item.subType?.toLowerCase()?.includes("emerald") ||
+			item.subType?.toLowerCase() === "block" ||
+			item.subType?.toLowerCase() === "liquid" ||
+			item.subType?.toLowerCase() === "stacks")
+	);
+}
 
 /** Powder name → local icon path (e.g. "Fire Powder I" → /powder/120px-FirePowder.png) */
 const POWDER_ICONS: Record<string, string> = {
@@ -52,6 +97,42 @@ function getCorkianIconPath(name: string): string | null {
 	return null;
 }
 
+/** Tome API subType → CDN slug (tome.{slug}.webp) */
+const TOME_SUBTYPE_MAP: Record<string, string> = {
+	allegiance: "guild",
+	combat: "weapon",
+	marathon: "movement",
+	expertise: "utility",
+	expertis: "utility",
+	syndicate: "lootrun",
+	defensive: "armour",
+	guild: "guild",
+	weapon: "weapon",
+	movement: "movement",
+	utility: "utility",
+	lootrun: "lootrun",
+	armour: "armour",
+};
+
+function getTomeIconSlug(subtype: string): string {
+	const key = (subtype ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+	// Match by include (e.g. "allegiance_tome_i" includes "allegiance" → guild)
+	for (const [mapKey, slug] of Object.entries(TOME_SUBTYPE_MAP)) {
+		if (key.includes(mapKey)) return slug;
+	}
+	return "guild";
+}
+
+function isTomeItem(item: ItemEntry | string): boolean {
+	if (typeof item === "string") return item.toLowerCase().includes("tome");
+	return (item.internalName ?? "").toLowerCase().includes("tome");
+}
+
+function getTomeSubtypeFromName(name: string): string | null {
+	if (!(name ?? "").toLowerCase().includes("tome")) return null;
+	return getTomeIconSlug(name);
+}
+
 function isKeyItem(name: string, type?: string, subType?: string): boolean {
 	const n = name.toLowerCase();
 	const t = type?.toLowerCase() ?? "";
@@ -74,23 +155,36 @@ function getItemIconUrl(item: ItemEntry | string): string | null {
 		const corkianPath = getCorkianIconPath(item);
 		if (corkianPath) return corkianPath;
 		if (isKeyItem(item)) return KEY_ICON;
+		const emeraldPath = getEmeraldIconPath(item);
+		if (emeraldPath) return emeraldPath;
+		const tomeSlug = getTomeSubtypeFromName(item);
+		if (tomeSlug !== null) return wynnTomeIconUrl(tomeSlug);
 		return wynnItemGuideUrl(item);
 	}
 
 	// Rune type (mock or real) – use local rune icons by name
-	if (item.type?.toLowerCase() === "rune" || item.subType?.toLowerCase() === "rune") {
+	if (
+		item.type?.toLowerCase() === "rune" ||
+		item.subType?.toLowerCase() === "rune"
+	) {
 		const runePath = getRuneIconPath(item.internalName ?? "");
 		if (runePath) return runePath;
 	}
 
 	// Powder type (enchanter) – use local powder icons by name
-	if (item.type?.toLowerCase() === "enchanter" && item.subType?.toLowerCase() === "powder") {
+	if (
+		item.type?.toLowerCase() === "enchanter" &&
+		item.subType?.toLowerCase() === "powder"
+	) {
 		const powderPath = getPowderIconPath(item.internalName ?? "");
 		if (powderPath) return powderPath;
 	}
 
 	// Corkian type (enchanter) – use local corkian icons by name
-	if (item.type?.toLowerCase() === "enchanter" && item.subType?.toLowerCase() === "corkian") {
+	if (
+		item.type?.toLowerCase() === "enchanter" &&
+		item.subType?.toLowerCase() === "corkian"
+	) {
 		const corkianPath = getCorkianIconPath(item.internalName ?? "");
 		if (corkianPath) return corkianPath;
 	}
@@ -100,75 +194,92 @@ function getItemIconUrl(item: ItemEntry | string): string | null {
 		return KEY_ICON;
 	}
 
-    if (!item.icon?.value) return null;
+	// Emerald type (Other + Emeraldpouch/Emerald/Block/Liquid/Stacks)
+	if (isEmeraldItem(item)) {
+		return getEmeraldIconPath(item);
+	}
 
-    const rawName =
-        typeof item.icon.value === "object"
-            ? item.icon.value?.name ?? ""
-            : String(item.icon.value);
+	// Tome type – CDN tome.{slug}.webp (Allegiance→guild, Combat→weapon, etc.)
+	if (isTomeItem(item)) {
+		const slug = item.subType
+			? getTomeIconSlug(item.subType)
+			: (getTomeSubtypeFromName(item.internalName ?? "") ?? "guild");
+		return wynnTomeIconUrl(slug);
+	}
 
-    if (!rawName.trim()) return null;
+	if (!item.icon?.value) return null;
 
-    if (item.type === "material") {
-        return wynnItemGuideUrl(rawName);
-    }
+	const rawName =
+		typeof item.icon.value === "object"
+			? (item.icon.value?.name ?? "")
+			: String(item.icon.value);
 
-    if (item.type === 'armour' && item.icon.format !== 'skin') {
-        if (item.armourMaterial?.includes('_')) {
-            const material = item.armourMaterial?.split('_')[1];
-            return wynnItemGuideUrl(`${material}_${item.armourType}`);
-        }
-        return wynnItemGuideUrl(`${item.armourMaterial}_${item.armourType}`);
-    }
+	if (!rawName.trim()) return null;
 
-    if (item.icon.format === "skin") {
-        const skinId =
-            typeof item.icon.value === "object"
-                ? item.icon.value?.id ?? item.icon.value?.name ?? ""
-                : String(item.icon.value);
-        return skinId.trim() ? `${MC_HEADS_BASE}/${skinId}` : null;
-    }
+	if (item.type === "material") {
+		return wynnItemGuideUrl(rawName);
+	}
 
-    if (item.icon.format === 'attribute' || item.icon.format === 'legacy') {
-        const iconValue =
-            typeof item.icon.value === 'object'
-                ? item.icon.value.name
-                : item.icon.value.replace(':', '_');
+	if (item.type === "armour" && item.icon.format !== "skin") {
+		if (item.armourMaterial?.includes("_")) {
+			const material = item.armourMaterial?.split("_")[1];
+			return wynnItemGuideUrl(`${material}_${item.armourType}`);
+		}
+		return wynnItemGuideUrl(`${item.armourMaterial}_${item.armourType}`);
+	}
 
-        return wynnItemGuideUrl(iconValue);
-    }
+	if (item.icon.format === "skin") {
+		const skinId =
+			typeof item.icon.value === "object"
+				? (item.icon.value?.id ?? item.icon.value?.name ?? "")
+				: String(item.icon.value);
+		return skinId.trim() ? `${MC_HEADS_BASE}/${skinId}` : null;
+	}
 
-    return wynnItemGuideUrl(rawName);
+	if (item.icon.format === "attribute" || item.icon.format === "legacy") {
+		const iconValue =
+			typeof item.icon.value === "object"
+				? item.icon.value.name
+				: item.icon.value.replace(":", "_");
+
+		return wynnItemGuideUrl(iconValue);
+	}
+
+	return wynnItemGuideUrl(rawName);
 }
 
-
 function ItemIcon({
-    item,
-    alt,
-    className,
+	item,
+	alt,
+	className,
 }: {
-    item: ItemEntry | string;
-    alt?: string;
-    className?: string;
+	item: ItemEntry | string;
+	alt?: string;
+	className?: string;
 }) {
-    const [imgError, setImgError] = useState(false);
-    const url = getItemIconUrl(item);
+	const [imgError, setImgError] = useState(false);
+	const url = getItemIconUrl(item);
 
-    const imgClass = cn("shrink-0 object-contain", className ?? "size-8");
-    if (imgError) {
-        return (
-            <img src="/wynn.webp" alt={alt ?? ""} className={imgClass} loading="lazy" />
-        );
-    }
-    return (
-        <img
-            src={url || "/wynn.webp"}
-            alt={alt ?? ""}
-            className={imgClass}
-            loading="lazy"
-            onError={() => setImgError(true)}
-        />
-    );
+	const imgClass = cn("shrink-0 object-contain", className ?? "size-8");
+	if (imgError) {
+		return (
+			<img
+				src="/wynn.webp"
+				alt={alt ?? ""}
+				className={imgClass}
+				loading="lazy"
+			/>
+		);
+	}
+	return (
+		<img
+			src={url || "/wynn.webp"}
+			alt={alt ?? ""}
+			className={imgClass}
+			loading="lazy"
+			onError={() => setImgError(true)}
+		/>
+	);
 }
 
 export { getItemIconUrl, ItemIcon };
