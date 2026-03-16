@@ -1,4 +1,11 @@
 import type { WynnventoryIcon } from "./common";
+import type { ItemEntry } from "@/types/item";
+
+/** Merged item data from both Wynncraft and Wynnventory APIs */
+export interface CompletedData<T> {
+	wynn: ItemEntry | undefined;
+	wynnInv: T;
+}
 
 
 export interface StatRoll {
@@ -124,4 +131,25 @@ export interface TradeRankingEntry {
 export interface TradeRankingParams {
 	start_date?: string;
 	end_date?: string;
+}
+
+/** Popular tab: merged ranking entry with Wynncraft item metadata */
+export interface MergedPopularEntry {
+	name: string;
+	tier: number | null;
+	completedData: CompletedData<TradeRankingEntry>;
+}
+
+/** Wynnventory data for a newly listed item */
+export interface NewlyListedWynnInv {
+	listing: TradeListing;
+	listing_price: number;
+	timestamp: string;
+}
+
+/** Newly listed tab: merged listing entry with Wynncraft item metadata */
+export interface MergedNewlyListedEntry {
+	name: string;
+	tier: number | null;
+	completedData: CompletedData<NewlyListedWynnInv>;
 }

@@ -175,8 +175,9 @@ export function ItemSearchInput({
 					{results.map(({ name, listing }, i) => {
 						const rarity = listing.rarity?.toLowerCase();
 						const tier = listing.tier;
+						const listKey = `${name}__${tier ?? "null"}`;
 						return (
-							<li key={name}>
+							<li key={listKey}>
 								<button
 									type="button"
 									onMouseDown={(e) => {

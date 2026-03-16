@@ -53,7 +53,6 @@ function processListingsToNewlyListed(items: TradeListing[]): NewlyListedEntry[]
 		}
 	}
 	return Array.from(byKey.values())
-		.filter((l) => l.listing_price > 1)
 		.sort(
 			(a, b) =>
 				new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),

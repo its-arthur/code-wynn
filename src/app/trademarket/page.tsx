@@ -14,6 +14,10 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useTradeMarketStore } from "@/store/trademarket-store";
+import type {
+	MergedPopularEntry,
+	MergedNewlyListedEntry,
+} from "@/types/wynnventory/trademarket";
 import type { ItemEntry } from "@/types/item";
 import { ItemIcon } from "@/lib/item-icons";
 import { ItemSearchInput } from "@/components/items/item-search-input";
@@ -34,6 +38,89 @@ function getItemTypeDisplay(item: ItemEntry | undefined): string | undefined {
 }
 
 const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute
+
+/** Look up Wynncraft item by name, trying name + tier variants when tier is set */
+function getWynnItem(
+	itemDb: Record<string, ItemEntry>,
+	name: string,
+	tier: number | null,
+): ItemEntry | undefined {
+	const direct = itemDb[name];
+	if (direct) return direct;
+	if (tier != null) {
+		const withTierNum = itemDb[`${name} ${tier}`];
+		if (withTierNum) return withTierNum;
+		const withTierRoman = itemDb[`${name} ${tierRoman(tier)}`];
+		if (withTierRoman) return withTierRoman;
+	}
+	return undefined;
+}
+
+const POWDER_TYPES = ["fire", "water", "air", "thunder", "earth"];
+const CORKIAN_TYPES = ["amplifier", "insulator", "simulator"];
+
+/** Detect enchanter subtype: rune, powder, corkian, or key */
+function getEnchanterSubType(
+	name: string,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): "rune" | "powder" | "corkian" | "key" | null {
+	const n = name.toLowerCase();
+	const itemType = wynnInv?.item_type?.toLowerCase() ?? wynnInv?.type?.toLowerCase() ?? "";
+
+	if (n.includes("rune") || itemType.includes("rune")) return "rune";
+	if (n.includes("key") || itemType.includes("key")) return "key";
+
+	for (const p of POWDER_TYPES) {
+		if (n.startsWith(p) || n.includes(` ${p} `) || n === `${p} powder`) return "powder";
+	}
+	if (n.includes("powder") || itemType.includes("powder")) return "powder";
+
+	if (n.includes("corkian")) return "corkian";
+	for (const c of CORKIAN_TYPES) {
+		if (n.includes(c)) return "corkian";
+	}
+
+	return null;
+}
+
+/** Detect if item is rune, key, powder, or corkian (not in Wynncraft item DB) */
+function isEnchanterItem(
+	name: string,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): boolean {
+	return getEnchanterSubType(name, wynnInv) != null;
+}
+
+/** Create mock wynn{} for runes, keys, powders, corkian – type: enchanter, subType: rune|powder|corkian|key */
+function createMockWynnForEnchanterItem(
+	name: string,
+	tier: number | null,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): ItemEntry {
+	const subType = getEnchanterSubType(name, wynnInv) ?? "key";
+	const rarity = wynnInv?.rarity ?? "common";
+	return {
+		internalName: tier != null ? `${name} ${tierRoman(tier)}` : name,
+		type: "enchanter",
+		subType: subType.charAt(0).toUpperCase() + subType.slice(1),
+		rarity,
+	};
+}
+
+/** Resolve wynn data: real from itemDb, or mock for enchanter items (rune/key/powder/corkian) */
+function resolveWynnData(
+	itemDb: Record<string, ItemEntry>,
+	name: string,
+	tier: number | null,
+	wynnInv?: { item_type?: string; type?: string; rarity?: string },
+): ItemEntry | undefined {
+	const wynn = getWynnItem(itemDb, name, tier);
+	if (wynn) return wynn;
+	if (isEnchanterItem(name, wynnInv)) {
+		return createMockWynnForEnchanterItem(name, tier, wynnInv);
+	}
+	return undefined;
+}
 
 export default function TradeMarketPage() {
 	const router = useRouter();
@@ -70,39 +157,64 @@ export default function TradeMarketPage() {
 		return () => clearInterval(id);
 	}, [refreshInBackground]);
 
-	const filteredPopular = useMemo(() => {
+	const mergedPopular = useMemo((): MergedPopularEntry[] => {
 		let result = ranking
-			.filter((r) => r.lowest_price > 1)
 			.sort((a, b) => b.total_count - a.total_count);
 		if (appliedSearch.trim()) {
 			const q = appliedSearch.trim().toLowerCase();
-			result = result.filter(
-				(r) =>
+			result = result.filter((r) => {
+				const wynn = resolveWynnData(itemDb, r.name, r.tier);
+				return (
 					r.name.toLowerCase().includes(q) ||
-					(itemDb[r.name]?.type?.toLowerCase().includes(q) ?? false) ||
-					(itemDb[r.name]?.subType?.toLowerCase().includes(q) ?? false),
-			);
+					(wynn?.type?.toLowerCase().includes(q) ?? false) ||
+					(wynn?.subType?.toLowerCase().includes(q) ?? false)
+				);
+			});
 		}
-		return result;
+		return result.map((r) => ({
+			name: r.name,
+			tier: r.tier,
+			completedData: {
+				wynn: resolveWynnData(itemDb, r.name, r.tier),
+				wynnInv: r,
+			},
+		}));
 	}, [ranking, itemDb, appliedSearch]);
 
-	const filteredNewlyListed = useMemo(() => {
+	const mergedNewlyListed = useMemo((): MergedNewlyListedEntry[] => {
 		let result = listings;
 		if (appliedSearch.trim()) {
 			const q = appliedSearch.trim().toLowerCase();
-			result = result.filter(
-				(r) =>
+			result = result.filter((r) => {
+				const wynn = resolveWynnData(itemDb, r.name, r.tier, r.listing);
+				return (
 					r.name.toLowerCase().includes(q) ||
-					(itemDb[r.name]?.type?.toLowerCase().includes(q) ?? false) ||
-					(itemDb[r.name]?.subType?.toLowerCase().includes(q) ?? false),
-			);
+					(wynn?.type?.toLowerCase().includes(q) ?? false) ||
+					(wynn?.subType?.toLowerCase().includes(q) ?? false)
+				);
+			});
 		}
-		return result;
+		return result.map((r) => ({
+			name: r.name,
+			tier: r.tier,
+			completedData: {
+				wynn: resolveWynnData(itemDb, r.name, r.tier, r.listing),
+				wynnInv: {
+					listing: r.listing,
+					listing_price: r.listing_price,
+					timestamp: r.timestamp,
+				},
+			},
+		}));
 	}, [listings, itemDb, appliedSearch]);
 
 	const filtered =
-		tab === "popular" ? filteredPopular : filteredNewlyListed;
+		tab === "popular" ? mergedPopular : mergedNewlyListed;
 	const isRankingData = tab === "popular";
+
+	useEffect(() => {
+		console.log("Trade market item data:", filtered);
+	}, [filtered]);
 
 	const total = filtered.length;
 	const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -242,31 +354,31 @@ export default function TradeMarketPage() {
 					<TableBody>
 								{isRankingData
 									? pageItems.map((entry) => {
-										const e = entry as (typeof filteredPopular)[number];
-										const item = itemDb[e.name];
-										const raw = item?.rarity ?? "";
+										const m = entry as MergedPopularEntry;
+										const { wynn, wynnInv } = m.completedData;
+										const raw = wynn?.rarity ?? "";
 										const rarity = raw
 											? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
 											: "";
 										const { text } = getRarityStyles(rarity);
 										return (
 											<TableRow
-												key={e.name + e.tier}
+												key={m.name + m.tier}
 												className="group cursor-pointer"
 												onClick={() => {
 													router.push(
-														`/trademarket/${encodeURIComponent(e.name)}${e.tier != null ? `?tier=${e.tier}` : ""}`,
+														`/trademarket/${encodeURIComponent(m.name)}${m.tier != null ? `?tier=${m.tier}` : ""}`,
 													);
 												}}
 											>
 												<TableCell className={cn("flex items-center gap-2 font-sans")}>
-													<ItemIcon item={item ?? e.name} alt={e.name} />
+													<ItemIcon item={wynn ?? m.name} alt={m.name} />
 													<div className="min-w-0">
 														<span className={cn("text-lg font-medium group-hover:underline")}>
-															{e.name}
-															{e.tier ? ` ${tierRoman(e.tier)}` : ""}
+															{m.name}
+															{m.tier ? ` ${tierRoman(m.tier)}` : ""}
 														</span>
-														{item && (
+														{wynn && (
 															<div
 																className={cn(
 																	"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
@@ -274,10 +386,10 @@ export default function TradeMarketPage() {
 																)}
 															>
 																{[
-																	item.requirements?.level != null &&
-																	`Lv.${item.requirements.level}`,
+																	wynn.requirements?.level != null &&
+																	`Lv.${wynn.requirements.level}`,
 																	rarity,
-																	getItemTypeDisplay(item),
+																	getItemTypeDisplay(wynn),
 																]
 																	.filter(Boolean)
 																	.map((s, i) => (
@@ -289,51 +401,51 @@ export default function TradeMarketPage() {
 
 												</TableCell>
 												<TableCell className="text-right font-mono">
-													<EmeraldPrice price={e.lowest_price} size="lg" />
+													<EmeraldPrice price={wynnInv.lowest_price} size="lg" />
 												</TableCell>
 												<TableCell className="text-right font-mono">
-													<EmeraldPrice price={e.average_price} size="lg" />
+													<EmeraldPrice price={wynnInv.average_price} size="lg" />
 												</TableCell>
 												<TableCell className="text-right text-lg tabular-nums font-mono">
-													{e.total_count.toLocaleString()}
+													{wynnInv.total_count.toLocaleString()}
 												</TableCell>
 											</TableRow>
 										);
 									})
 									: pageItems.map((entry) => {
-										const e = entry as (typeof filteredNewlyListed)[number];
-										const item = itemDb[e.name];
-										const raw = item?.rarity ?? e.listing?.rarity ?? "";
+										const m = entry as MergedNewlyListedEntry;
+										const { wynn, wynnInv } = m.completedData;
+										const raw = wynn?.rarity ?? wynnInv.listing?.rarity ?? "";
 										const rarity = raw
 											? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
 											: "";
 										const { text } = getRarityStyles(rarity);
 										return (
 											<TableRow
-												key={e.name + e.tier + e.timestamp}
+												key={m.name + m.tier + wynnInv.timestamp}
 												className="group cursor-pointer"
 												onClick={() => {
 													router.push(
-														`/trademarket/${encodeURIComponent(e.name)}${e.tier != null ? `?tier=${e.tier}` : ""}`,
+														`/trademarket/${encodeURIComponent(m.name)}${m.tier != null ? `?tier=${m.tier}` : ""}`,
 													);
 												}}
 											>
 												<TableCell className={cn("flex items-center gap-2 font-sans")}>
 													<ItemIcon
 														item={
-															item ??
-															(typeof e.listing.icon?.value === "string"
-																? e.listing.icon.value
-																: e.name)
+															wynn ??
+															(typeof wynnInv.listing.icon?.value === "string"
+																? wynnInv.listing.icon.value
+																: m.name)
 														}
-														alt={e.name}
+														alt={m.name}
 													/>
 													<div className="min-w-0">
 														<span className={cn("text-lg font-medium group-hover:underline")}>
-															{e.name}
-															{e.tier ? ` ${tierRoman(e.tier)}` : ""}
+															{m.name}
+															{m.tier ? ` ${tierRoman(m.tier)}` : ""}
 														</span>
-														{(item || e.listing) && (
+														{(wynn || wynnInv.listing) && (
 															<div
 																className={cn(
 																	"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
@@ -341,10 +453,10 @@ export default function TradeMarketPage() {
 																)}
 															>
 																{[
-																	item?.requirements?.level != null &&
-																	`Lv.${item.requirements.level}`,
+																	wynn?.requirements?.level != null &&
+																	`Lv.${wynn.requirements.level}`,
 																	rarity,
-																	getItemTypeDisplay(item ?? undefined),
+																	getItemTypeDisplay(wynn ?? undefined),
 																]
 																	.filter(Boolean)
 																	.map((s, i) => (
@@ -355,10 +467,10 @@ export default function TradeMarketPage() {
 													</div>
 												</TableCell>
 												<TableCell className="text-right font-mono">
-													<EmeraldPrice price={e.listing_price} size="lg" />
+													<EmeraldPrice price={wynnInv.listing_price} size="lg" />
 												</TableCell>
 												<TableCell className="text-right text-muted-foreground text-sm">
-													{formatTimeElapsed(e.timestamp)}
+													{formatTimeElapsed(wynnInv.timestamp)}
 												</TableCell>
 											</TableRow>
 										);
