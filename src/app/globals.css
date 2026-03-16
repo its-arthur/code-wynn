@@ -79,6 +79,15 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Wynncraft rarity colors */
+  --color-common: #e2e8f0;
+  --color-set: #55ff55;
+  --color-unique: #ffff55;
+  --color-rare: #ff55ff;
+  --color-legendary: #55ffff;
+  --color-fabled: #ff5555;
+  --color-mythic: #aa00aa;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);

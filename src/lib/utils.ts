@@ -30,6 +30,31 @@ export function formatDateDDMonthYear(isoDate: string): string {
 	return `${day} ${month} ${year}`;
 }
 
+export function tierRoman(tier: number): string {
+	return [
+		"I",
+		"II",
+		"III",
+		"IV",
+		"V",
+		"VI",
+		"VII",
+		"VIII",
+		"IX",
+		"X",
+		"XI",
+		"XII",
+		"XIII",
+		"XIV",
+		"XV",
+		"XVI",
+		"XVII",
+		"XVIII",
+		"XIX",
+		"XX",
+	][tier - 1];
+}
+
 /**
  * Format an ISO date string as time elapsed from now (e.g. "2 days ago", "3 hours ago").
  */

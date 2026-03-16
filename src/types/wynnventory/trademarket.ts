@@ -1,5 +1,17 @@
 import type { WynnventoryIcon } from "./common";
 
+
+export interface StatRoll {
+	displayName?: string;
+	apiName?: string;
+	statActualValue?: { value: number };
+	statRange?: { low: number; high: number };
+	statRoll?: number;
+	unit?: string;
+	rollPercentage?: number | string;
+	stars?: number;
+}
+
 export interface TradeListing {
 	amount: number;
 	hash_code: number;
@@ -11,7 +23,10 @@ export interface TradeListing {
 	rarity: string;
 	shiny_stat: string | null;
 	tier: number | null;
+	stat_rolls?: StatRoll[];
 	timestamp: string;
+	overall_roll?: number;
+	reroll_count?: number;
 	type: string;
 	unidentified: boolean;
 }
@@ -81,6 +96,7 @@ export interface TradeHistoricDay {
 	highest_price: number;
 	item_type: string;
 	lowest_price: number;
+	timestamp: string;
 	name: string;
 	shiny_stat: string | null;
 	tier: number | null;
@@ -97,6 +113,7 @@ export interface TradeRankingEntry {
 	average_unidentified_count: number;
 	highest_price: number;
 	lowest_price: number;
+	tier: number | null;
 	name: string;
 	rank: number;
 	total_count: number;

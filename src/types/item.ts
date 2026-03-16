@@ -83,6 +83,7 @@ export interface ItemEntry {
 	identifier?: boolean;
 	allow_craftsman?: boolean;
 
+	armourType?: string;
 	armourMaterial?: string;
 	attackSpeed?: string;
 	averageDPS?: number;

@@ -33,7 +33,7 @@ const DENOMINATIONS: { key: keyof PriceBreakdown; icon: string; label: string }[
 
 interface EmeraldPriceProps {
 	price: number;
-	size?: "sm" | "md";
+	size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl";
 	hideZero?: boolean;
 	className?: string;
 }
@@ -45,8 +45,8 @@ export function EmeraldPrice({
 	className,
 }: EmeraldPriceProps) {
 	const bd = toPriceBreakdown(price);
-	const iconSize = size === "sm" ? "size-3.5" : "size-4";
-	const textSize = size === "sm" ? "text-xs" : "text-sm";
+	const iconSize = size === "xs" ? "size-3" : size === "sm" ? "size-3.5" : size === "md" ? "size-4" : size === "lg" ? "size-5" : size === "xl" ? "size-6" : size === "2xl" ? "size-7" : size === "3xl" ? "size-8" : size === "4xl" ? "size-9" : size === "5xl" ? "size-10" : "size-4";
+	const textSize = size === "xs" ? "text-xs" : size === "sm" ? "text-sm" : size === "md" ? "text-md" : size === "lg" ? "text-lg" : size === "xl" ? "text-xl" : size === "2xl" ? "text-2xl" : size === "3xl" ? "text-3xl" : size === "4xl" ? "text-4xl" : size === "5xl" ? "text-5xl" : "text-md";
 
 	const parts = DENOMINATIONS.filter(
 		({ key }) => !hideZero || bd[key] > 0,

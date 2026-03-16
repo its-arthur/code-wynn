@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronDown, ChevronUp, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -14,188 +13,100 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { getTradeRanking } from "@/api/wynnventory/trademarket";
-import { getItemDatabaseFull } from "@/api/item";
-import type { TradeRankingEntry } from "@/types/wynnventory/trademarket";
-import type { ItemDatabase, ItemEntry } from "@/types/item";
-import { wynnItemGuideUrl } from "@/lib/wynn-cdn";
+import { useTradeMarketStore } from "@/store/trademarket-store";
+import type { ItemEntry } from "@/types/item";
+import { ItemIcon } from "@/lib/item-icons";
+import { ItemSearchInput } from "@/components/items/item-search-input";
 import { EmeraldPrice } from "@/components/emerald-price";
-import { cn } from "@/lib/utils";
+import { cn, tierRoman, formatTimeElapsed } from "@/lib/utils";
+import { getRarityStyles } from "@/lib/rarity-color";
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 50;
 
-/** Category filter: type (and optional subType for armour/weapon/accessory) */
-const CATEGORIES: {
-	label: string;
-	type?: string;
-	subTypes?: { value: string; label: string }[];
-}[] = [
-	{ label: "All Categories" },
-	{
-		label: "Armor",
-		type: "armour",
-		subTypes: [
-			{ value: "all", label: "All" },
-			{ value: "helmet", label: "Helmet" },
-			{ value: "chestplate", label: "Chestplate" },
-			{ value: "leggings", label: "Leggings" },
-			{ value: "boots", label: "Boots" },
-		],
-	},
-	{
-		label: "Weapon",
-		type: "weapon",
-		subTypes: [
-			{ value: "all", label: "All" },
-			{ value: "wand", label: "Wand" },
-			{ value: "spear", label: "Spear" },
-			{ value: "bow", label: "Bow" },
-			{ value: "dagger", label: "Dagger" },
-			{ value: "relik", label: "Relik" },
-		],
-	},
-	{
-		label: "Accessory",
-		type: "accessory",
-		subTypes: [
-			{ value: "all", label: "All" },
-			{ value: "ring", label: "Ring" },
-			{ value: "bracelet", label: "Bracelet" },
-			{ value: "necklace", label: "Necklace" },
-		],
-	},
-	{ label: "Crafting Material", type: "crafting" },
-	{ label: "Crafting Ingredient", type: "ingredient" },
-	{ label: "Mounts", type: "mount" },
-	{ label: "Enhancer", type: "enhancer" },
-	{ label: "Key", type: "key" },
-	{ label: "Other", type: "other" },
-];
-
-function getIconName(entry: ItemEntry | undefined): string | null {
-	if (!entry?.icon?.value) return null;
-	if (typeof entry.icon.value === "string") return entry.icon.value;
-	return entry.icon.value.name ?? null;
+function getItemTypeDisplay(item: ItemEntry | undefined): string | undefined {
+	if (!item) return undefined;
+	const withExtras = item as ItemEntry & { weaponType?: string };
+	if (withExtras.weaponType)
+		return withExtras.weaponType.replace(/([A-Z])/g, " $1").trim();
+	if (item.type?.toLowerCase() === "armour" || item.type?.toLowerCase() === "armor")
+		return (item.armourType ?? item.subType)?.replace(/([A-Z])/g, " $1").trim();
+	return item.type?.replace(/([A-Z])/g, " $1").trim();
 }
 
-function ItemIcon({ name, item }: { name: string; item?: ItemEntry }) {
-	const [err, setErr] = useState(false);
-	const iconName = getIconName(item);
-
-	if (!iconName || err) {
-		return (
-			<span className="flex size-8 shrink-0 items-center justify-center rounded bg-muted/60 text-[10px] text-muted-foreground">
-				?
-			</span>
-		);
-	}
-
-	return (
-		<img
-			src={wynnItemGuideUrl(iconName)}
-			alt={name}
-			className="size-8 shrink-0 object-contain"
-			loading="lazy"
-			onError={() => setErr(true)}
-		/>
-	);
-}
-
-const TYPE_ALIASES: Record<string, string[]> = {
-	crafting: ["crafting", "material"],
-};
-
-function matchesCategory(
-	item: ItemEntry | undefined,
-	categoryType: string | undefined,
-	subType: string | undefined,
-): boolean {
-	if (!categoryType || categoryType === "all") return true;
-	if (!item?.type) return false;
-
-	const itemType = item.type.toLowerCase();
-	const aliases = TYPE_ALIASES[categoryType] ?? [categoryType.toLowerCase()];
-	const matchType = aliases.includes(itemType);
-
-	if (!subType || subType === "all") return matchType;
-	if (!item.subType) return matchType;
-
-	const itemSub = item.subType.toLowerCase();
-	return matchType && itemSub === subType.toLowerCase();
-}
+const REFRESH_INTERVAL_MS = 60 * 1000; // 1 minute
 
 export default function TradeMarketPage() {
-	const [ranking, setRanking] = useState<TradeRankingEntry[]>([]);
-	const [itemDb, setItemDb] = useState<ItemDatabase>({});
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const router = useRouter();
+	const {
+		ranking,
+		listings,
+		itemDb,
+		loading,
+		loadingListings,
+		error,
+		fetch,
+		fetchListings,
+		refreshInBackground,
+	} = useTradeMarketStore();
+	const [tab, setTab] = useState<"popular" | "newly_listed">("popular");
 	const [searchQuery, setSearchQuery] = useState("");
+	const [appliedSearch, setAppliedSearch] = useState("");
 	const [page, setPage] = useState(1);
-	const [category, setCategory] = useState<{ type?: string; subType?: string }>({
-		type: undefined,
-		subType: undefined,
-	});
-	const [categoryOpen, setCategoryOpen] = useState(true);
-
-	const fetchRanking = useCallback(() => {
-		setLoading(true);
-		setError(null);
-		Promise.all([getTradeRanking(), getItemDatabaseFull()])
-			.then(([rankData, dbData]) => {
-				setRanking(rankData);
-				setItemDb(dbData);
-			})
-			.catch((e) =>
-				setError(e instanceof Error ? e.message : "Failed to load"),
-			)
-			.finally(() => setLoading(false));
-	}, []);
-
-	useEffect(() => {
-		fetchRanking();
-	}, [fetchRanking]);
-
-	const filtered = useMemo(() => {
-		let result = ranking;
-
-		if (searchQuery.trim()) {
-			const q = searchQuery.trim().toLowerCase();
-			result = result.filter((r) => r.name.toLowerCase().includes(q));
-		}
-
-		if (category.type) {
-			result = result.filter((r) =>
-				matchesCategory(itemDb[r.name], category.type, category.subType),
-			);
-		}
-
-		return result;
-	}, [ranking, searchQuery, category, itemDb]);
-
 	useEffect(() => {
 		setPage(1);
-	}, [searchQuery, category]);
+	}, [tab]);
 
-	const categoryCounts = useMemo(() => {
-		const counts: Record<string, number> = { all: ranking.length };
-		for (const c of CATEGORIES) {
-			if (!c.type) continue;
-			const n = ranking.filter((r) =>
-				matchesCategory(itemDb[r.name], c.type, undefined),
-			).length;
-			counts[c.type] = n;
+	useEffect(() => {
+		if (tab === "newly_listed") fetchListings();
+	}, [tab, fetchListings]);
+
+	useEffect(() => {
+		fetch();
+	}, [fetch]);
+
+	// Refresh cache every 1 minute in background
+	useEffect(() => {
+		const id = setInterval(refreshInBackground, REFRESH_INTERVAL_MS);
+		return () => clearInterval(id);
+	}, [refreshInBackground]);
+
+	const filteredPopular = useMemo(() => {
+		let result = ranking
+			.filter((r) => r.lowest_price > 1)
+			.sort((a, b) => b.total_count - a.total_count);
+		if (appliedSearch.trim()) {
+			const q = appliedSearch.trim().toLowerCase();
+			result = result.filter(
+				(r) =>
+					r.name.toLowerCase().includes(q) ||
+					(itemDb[r.name]?.type?.toLowerCase().includes(q) ?? false) ||
+					(itemDb[r.name]?.subType?.toLowerCase().includes(q) ?? false),
+			);
 		}
-		return counts;
-	}, [ranking, itemDb]);
+		return result;
+	}, [ranking, itemDb, appliedSearch]);
 
-	const maxPage = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+	const filteredNewlyListed = useMemo(() => {
+		let result = listings;
+		if (appliedSearch.trim()) {
+			const q = appliedSearch.trim().toLowerCase();
+			result = result.filter(
+				(r) =>
+					r.name.toLowerCase().includes(q) ||
+					(itemDb[r.name]?.type?.toLowerCase().includes(q) ?? false) ||
+					(itemDb[r.name]?.subType?.toLowerCase().includes(q) ?? false),
+			);
+		}
+		return result;
+	}, [listings, itemDb, appliedSearch]);
+
+	const filtered =
+		tab === "popular" ? filteredPopular : filteredNewlyListed;
+	const isRankingData = tab === "popular";
+
+	const total = filtered.length;
+	const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 	const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
 	const pageNumbers = useMemo(() => {
 		const pages: (number | "ellipsis")[] = [];
 		const delta = 2;
@@ -213,147 +124,80 @@ export default function TradeMarketPage() {
 
 	return (
 		<div className="flex flex-col gap-6 lg:flex-row">
-			{/* Filters sidebar */}
-			<aside className="w-full shrink-0 lg:w-56">
-				<Collapsible open={categoryOpen} onOpenChange={setCategoryOpen}>
-					<CollapsibleTrigger asChild>
-						<button
-							type="button"
-							className="flex w-full items-center justify-between rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-sm font-medium hover:bg-muted/50"
-						>
-							Browse by Category
-							{categoryOpen ? (
-								<ChevronUp className="size-4" />
-							) : (
-								<ChevronDown className="size-4" />
-							)}
-						</button>
-					</CollapsibleTrigger>
-					<CollapsibleContent>
-						<nav className="mt-2 space-y-0.5">
-							{CATEGORIES.map((c) => {
-								if (c.subTypes && c.type) {
-									const isExpanded = category.type === c.type;
-									const count = categoryCounts[c.type] ?? 0;
-									return (
-										<div key={c.type}>
-											<button
-												type="button"
-												onClick={() =>
-													setCategory({
-														type: c.type,
-														subType: "all",
-													})
-												}
-												className={cn(
-													"flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm",
-													category.type === c.type
-														? "bg-primary/20 text-primary"
-														: "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-												)}
-											>
-												{c.label}
-												<span className="tabular-nums">{count}</span>
-											</button>
-											{isExpanded && (
-												<div className="ml-3 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
-													{c.subTypes.map((st) => {
-														const subActive =
-															category.subType === st.value;
-														return (
-															<button
-																key={st.value}
-																type="button"
-																onClick={() =>
-																	setCategory({
-																		type: c.type,
-																		subType: st.value,
-																	})
-																}
-																className={cn(
-																	"block w-full rounded px-2 py-1 text-left text-xs",
-																	subActive
-																		? "bg-primary/20 text-primary"
-																		: "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-																)}
-															>
-																{st.label}
-															</button>
-														);
-													})}
-												</div>
-											)}
-										</div>
-									);
-								}
-								const isActive = category.type === c.type && !category.subType;
-								const count = c.type ? (categoryCounts[c.type] ?? 0) : 0;
-								return (
-									<button
-										key={c.type ?? "all"}
-										type="button"
-										onClick={() =>
-											setCategory(
-												c.type
-													? { type: c.type, subType: undefined }
-													: { type: undefined, subType: undefined },
-											)
-										}
-										className={cn(
-											"flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm",
-											isActive
-												? "bg-primary/20 text-primary"
-												: "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-										)}
-									>
-										{c.label}
-										{c.type ? (
-											<span className="tabular-nums">{count}</span>
-										) : null}
-									</button>
-								);
-							})}
-						</nav>
-					</CollapsibleContent>
-				</Collapsible>
-			</aside>
-
 			{/* Main content */}
 			<div className="min-w-0 flex-1 space-y-4">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-				<div className="relative flex-1 sm:max-w-xs">
-					<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						placeholder="Search items..."
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						className="pl-9 pr-8"
-					/>
-					{searchQuery && (
+				<div className="flex flex-col gap-3">
+					<div className="flex flex-wrap items-center gap-2">
+						<div className="flex rounded-lg border border-border/50 p-0.5">
 						<button
 							type="button"
-							onClick={() => setSearchQuery("")}
-							className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-						>
-							<X className="size-3.5" />
-						</button>
-					)}
-				</div>
+								onClick={() => setTab("popular")}
+								className={cn(
+									"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+									tab === "popular"
+										? "bg-primary text-primary-foreground"
+										: "text-muted-foreground hover:text-foreground",
+								)}
+							>
+								Popular
+							</button>
+							<button
+								type="button"
+								onClick={() => setTab("newly_listed")}
+								className={cn(
+									"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+									tab === "newly_listed"
+										? "bg-primary text-primary-foreground"
+										: "text-muted-foreground hover:text-foreground",
+								)}
+							>
+								Newly Listed
+							</button>
+						</div>
+					</div>
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+						<div className="flex items-center gap-2">
+							<ItemSearchInput
+								value={searchQuery}
+								onChange={setSearchQuery}
+								onSelect={(name, tier) => {
+									if (name) {
+										const base = `/trademarket/${encodeURIComponent(name)}`;
+										const url = tier != null ? `${base}?tier=${tier}` : base;
+										router.push(url);
+									}
+								}}
+								className="flex-1 sm:max-w-lg"
+							/>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									setAppliedSearch(searchQuery.trim());
+									setPage(1);
+								}}
+							>
+								<Search className="size-4" />
+								Search
+							</Button>
+						</div>
+
 
 				<div className="flex items-center gap-2">
-					{!loading && (
+							{!loading && !loadingListings && (
 						<p className="text-sm text-muted-foreground">
-							{filtered.length.toLocaleString()} items
-							{searchQuery.trim() && ` matching "${searchQuery.trim()}"`}
+									{total.toLocaleString()} items
 						</p>
 					)}
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={fetchRanking}
-						disabled={loading}
+								onClick={() =>
+									tab === "popular" ? fetch(true) : fetchListings(true)
+								}
+								disabled={tab === "popular" ? loading : loadingListings}
 					>
-						{loading ? (
+								{loading || loadingListings ? (
 							<Loader2 className="animate-spin" />
 						) : (
 							<RefreshCw />
@@ -361,6 +205,7 @@ export default function TradeMarketPage() {
 						Refresh
 					</Button>
 				</div>
+					</div>
 			</div>
 
 			{error && (
@@ -369,49 +214,155 @@ export default function TradeMarketPage() {
 				</div>
 			)}
 
-			{loading ? (
+				{loading || (tab === "newly_listed" && loadingListings) ? (
 				<div className="space-y-2">
 					{Array.from({ length: 15 }).map((_, i) => (
 						<Skeleton key={i} className="h-10 rounded-md" />
 					))}
 				</div>
-			) : pageItems.length > 0 ? (
+				) : pageItems.length > 0 ? (
 				<Table>
 					<TableHeader>
-						<TableRow>
-							<TableHead className="w-12 text-center">#</TableHead>
+								<TableRow>
 							<TableHead>Name</TableHead>
-							<TableHead className="text-right">Lowest</TableHead>
-							<TableHead className="text-right">Average</TableHead>
-							<TableHead className="w-24 text-right">Quantity</TableHead>
+									<TableHead className="text-right">
+										{isRankingData ? "Lowest" : "Price"}
+									</TableHead>
+									{isRankingData && (
+										<>
+											<TableHead className="text-right">Average</TableHead>
+											<TableHead className="w-24 text-right">Quantity</TableHead>
+										</>
+									)}
+									{!isRankingData && (
+										<TableHead className="text-right">Listed</TableHead>
+									)}
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{pageItems.map((entry) => (
-							<TableRow key={entry.name} className="group">
-								<TableCell className="text-center text-xs text-muted-foreground tabular-nums">
-									{entry.rank}
-								</TableCell>
-								<TableCell>
-									<Link
-										href={`/trademarket/${encodeURIComponent(entry.name)}`}
-										className="flex items-center gap-2 font-medium text-sm hover:underline"
-									>
-										<ItemIcon name={entry.name} item={itemDb[entry.name]} />
-										{entry.name}
-									</Link>
-								</TableCell>
-								<TableCell className="text-right">
-									<EmeraldPrice price={entry.lowest_price} />
-								</TableCell>
-								<TableCell className="text-right">
-									<EmeraldPrice price={entry.average_price} />
-								</TableCell>
-								<TableCell className="text-right text-xs tabular-nums">
-									{entry.total_count.toLocaleString()}
-								</TableCell>
-							</TableRow>
-						))}
+								{isRankingData
+									? pageItems.map((entry) => {
+										const e = entry as (typeof filteredPopular)[number];
+										const item = itemDb[e.name];
+										const raw = item?.rarity ?? "";
+										const rarity = raw
+											? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+											: "";
+										const { text } = getRarityStyles(rarity);
+										return (
+											<TableRow
+												key={e.name + e.tier}
+												className="group cursor-pointer"
+												onClick={() => {
+													router.push(
+														`/trademarket/${encodeURIComponent(e.name)}${e.tier != null ? `?tier=${e.tier}` : ""}`,
+													);
+												}}
+											>
+												<TableCell className={cn("flex items-center gap-2 font-sans")}>
+													<ItemIcon item={item ?? e.name} alt={e.name} />
+													<div className="min-w-0">
+														<span className={cn("text-lg font-medium group-hover:underline")}>
+															{e.name}
+															{e.tier ? ` ${tierRoman(e.tier)}` : ""}
+														</span>
+														{item && (
+															<div
+																className={cn(
+																	"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
+																	text,
+																)}
+															>
+																{[
+																	item.requirements?.level != null &&
+																	`Lv.${item.requirements.level}`,
+																	rarity,
+																	getItemTypeDisplay(item),
+																]
+																	.filter(Boolean)
+																	.map((s, i) => (
+																		<span key={i}>{s}</span>
+																	))}
+															</div>
+														)}
+													</div>
+
+												</TableCell>
+												<TableCell className="text-right font-mono">
+													<EmeraldPrice price={e.lowest_price} size="lg" />
+												</TableCell>
+												<TableCell className="text-right font-mono">
+													<EmeraldPrice price={e.average_price} size="lg" />
+												</TableCell>
+												<TableCell className="text-right text-lg tabular-nums font-mono">
+													{e.total_count.toLocaleString()}
+												</TableCell>
+											</TableRow>
+										);
+									})
+									: pageItems.map((entry) => {
+										const e = entry as (typeof filteredNewlyListed)[number];
+										const item = itemDb[e.name];
+										const raw = item?.rarity ?? e.listing?.rarity ?? "";
+										const rarity = raw
+											? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+											: "";
+										const { text } = getRarityStyles(rarity);
+										return (
+											<TableRow
+												key={e.name + e.tier + e.timestamp}
+												className="group cursor-pointer"
+												onClick={() => {
+													router.push(
+														`/trademarket/${encodeURIComponent(e.name)}${e.tier != null ? `?tier=${e.tier}` : ""}`,
+													);
+												}}
+											>
+												<TableCell className={cn("flex items-center gap-2 font-sans")}>
+													<ItemIcon
+														item={
+															item ??
+															(typeof e.listing.icon?.value === "string"
+																? e.listing.icon.value
+																: e.name)
+														}
+														alt={e.name}
+													/>
+													<div className="min-w-0">
+														<span className={cn("text-lg font-medium group-hover:underline")}>
+															{e.name}
+															{e.tier ? ` ${tierRoman(e.tier)}` : ""}
+														</span>
+														{(item || e.listing) && (
+															<div
+																className={cn(
+																	"flex flex-wrap items-center gap-2 text-sm capitalize font-mono truncate",
+																	text,
+																)}
+															>
+																{[
+																	item?.requirements?.level != null &&
+																	`Lv.${item.requirements.level}`,
+																	rarity,
+																	getItemTypeDisplay(item ?? undefined),
+																]
+																	.filter(Boolean)
+																	.map((s, i) => (
+																		<span key={i}>{s}</span>
+																	))}
+															</div>
+														)}
+													</div>
+												</TableCell>
+												<TableCell className="text-right font-mono">
+													<EmeraldPrice price={e.listing_price} size="lg" />
+												</TableCell>
+												<TableCell className="text-right text-muted-foreground text-sm">
+													{formatTimeElapsed(e.timestamp)}
+												</TableCell>
+											</TableRow>
+										);
+									})}
 					</TableBody>
 				</Table>
 			) : (

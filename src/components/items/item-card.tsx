@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { ItemEntry } from "@/types/item";
 import { cn } from "@/lib/utils";
-import { wynnItemGuideUrl } from "@/lib/wynn-cdn";
+import { ItemIcon } from "@/lib/item-icons";
 
 const RARITY_COLORS: Record<string, string> = {
 	common: "text-gray-400",
@@ -40,11 +39,6 @@ function formatType(type: string, subType?: string) {
 	return `${s} ${t}`;
 }
 
-function getIconName(item: ItemEntry): string | null {
-	if (!item.icon?.value) return null;
-	if (typeof item.icon.value === "string") return item.icon.value;
-	return item.icon.value.name ?? null;
-}
 
 export function ItemCard({
 	name,
@@ -52,9 +46,7 @@ export function ItemCard({
 }: {
 	name: string;
 	item: ItemEntry;
-}) {
-	const [imgError, setImgError] = useState(false);
-	const iconName = getIconName(item);
+	}) {
 	const rarity = typeof item.rarity === "string" ? item.rarity.toLowerCase() : null;
 	const tier = typeof item.tier === "number" ? item.tier : null;
 	const nameColor = rarity ? RARITY_COLORS[rarity] ?? "text-foreground" : "text-foreground";
@@ -67,21 +59,9 @@ export function ItemCard({
 
 	return (
 		<div className="group flex gap-3 rounded-lg border border-border/50 bg-muted/40 px-3 py-2.5 transition-colors hover:border-border hover:bg-muted/70">
-			{iconName && !imgError ? (
-				<div className="flex size-10 shrink-0 items-center justify-center">
-					<img
-						src={wynnItemGuideUrl(iconName)}
-						alt={name}
-						className="size-10 object-contain"
-						loading="lazy"
-						onError={() => setImgError(true)}
-					/>
-				</div>
-			) : (
-				<div className="flex size-10 shrink-0 items-center justify-center rounded bg-muted/60 text-xs text-muted-foreground">
-					?
-				</div>
-			)}
+			<div className="flex size-10 shrink-0 items-center justify-center">
+				<ItemIcon item={item} alt={name} className="size-10" />
+			</div>
 
 			<div className="flex min-w-0 flex-1 flex-col gap-1">
 				<div className="flex items-start justify-between gap-2">
@@ -97,6 +77,7 @@ export function ItemCard({
 						</Badge>
 					)}
 				</div>
+
 
 				<div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
 					<span className="capitalize">{formatType(item.type, item.subType)}</span>

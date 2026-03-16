@@ -12,17 +12,16 @@ import {
 } from "lucide-react";
 import {
 	Area,
-	AreaChart,
+	Bar,
 	CartesianGrid,
+	ComposedChart,
+	Line,
 	XAxis,
 	YAxis,
-	Line,
-	LineChart,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Select,
 	SelectContent,
@@ -30,6 +29,15 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
 import {
 	ChartContainer,
 	ChartTooltip,
@@ -42,14 +50,16 @@ import {
 	getTradeListingsForItem,
 } from "@/api/wynnventory/trademarket";
 import { quickSearchItems } from "@/api/item";
+import { useTradeMarketStore } from "@/store/trademarket-store";
 import type {
 	TradePriceInfo,
 	TradeHistoricDay,
 	TradeListing,
+	StatRoll,
 } from "@/types/wynnventory/trademarket";
-import type { ItemEntry } from "@/types/item";
-import { cn } from "@/lib/utils";
-import { wynnItemGuideUrl } from "@/lib/wynn-cdn";
+import type { ItemEntry, ItemIdentification } from "@/types/item";
+import { cn, tierRoman } from "@/lib/utils";
+import { ItemIcon } from "@/lib/item-icons";
 import { EmeraldPrice } from "@/components/emerald-price";
 
 const RARITY_COLORS: Record<string, string> = {
@@ -71,25 +81,34 @@ const RARITY_BADGE: Record<string, string> = {
 };
 
 const chartConfig = {
-	average_price: {
-		label: "Avg Price",
-		color: "hsl(142, 71%, 45%)",
-	},
-	average_mid_80_percent_price: {
-		label: "Mid 80% Avg",
-		color: "hsl(217, 91%, 60%)",
-	},
-	highest_price: {
-		label: "Highest",
-		color: "hsl(0, 84%, 60%)",
-	},
-	lowest_price: {
-		label: "Lowest",
-		color: "hsl(45, 93%, 47%)",
-	},
+	average_price: { label: "Avg", color: "hsl(142, 71%, 45%)" },
+	average_mid_80_percent_price: { label: "Mid 80%", color: "hsl(217, 91%, 60%)" },
+	highest_price: { label: "High", color: "hsl(0, 84%, 60%)" },
+	lowest_price: { label: "Low", color: "hsl(45, 93%, 47%)" },
+	unidentified_average_price: { label: "Unid Avg", color: "hsl(300, 60%, 60%)" },
+	total_count: { label: "Volume", color: "hsl(262, 83%, 58%)" },
 } satisfies ChartConfig;
 
-type DateRange = "7d" | "30d" | "90d" | "all";
+type SeriesKey = keyof typeof chartConfig;
+
+const ALL_SERIES: SeriesKey[] = [
+	"average_price",
+	"average_mid_80_percent_price",
+	"highest_price",
+	"lowest_price",
+	"unidentified_average_price",
+	"total_count",
+];
+
+const DEFAULT_VISIBLE = new Set<SeriesKey>([
+	"average_price",
+	"average_mid_80_percent_price",
+	"highest_price",
+	"lowest_price",
+	"total_count",
+]);
+
+type DateRange = "1d" | "7d" | "30d" | "90d";
 
 function formatPrice(price: number): string {
 	if (price >= 1_000_000) return `${(price / 1_000_000).toFixed(1)}M`;
@@ -119,12 +138,60 @@ function formatDateShort(dateStr: string): string {
 	return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function getStartDate(range: DateRange): string | undefined {
-	if (range === "all") return undefined;
-	const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
+function formatTimeShort(dateStr: string): string {
+	const d = parseDate(dateStr);
+	if (Number.isNaN(d.getTime())) return dateStr;
+	return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function formatDateTimeFull(dateStr: string): string {
+	const d = parseDate(dateStr);
+	if (Number.isNaN(d.getTime())) return dateStr;
+	return d.toLocaleString("en-US", {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+	});
+}
+
+function getStartDate(range: DateRange): string {
 	const d = new Date();
+	const days = range === "1d" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : 90;
 	d.setDate(d.getDate() - days);
 	return d.toISOString().slice(0, 10);
+}
+
+function formatTimeElapsed(dateStr: string): string {
+	const d = parseDate(dateStr);
+	if (Number.isNaN(d.getTime())) return dateStr;
+	const now = new Date();
+	const ms = now.getTime() - d.getTime();
+	const s = Math.floor(ms / 1000);
+	const m = Math.floor(s / 60);
+	const h = Math.floor(m / 60);
+	const d_ = Math.floor(h / 24);
+	if (s < 60) return "now";
+	if (m < 60) return `${m}m ago`;
+	if (h < 24) return `${h}h ago`;
+	if (d_ < 7) return `${d_}d ago`;
+	return formatDateShort(dateStr);
+}
+
+function formatStatRollValue(s: StatRoll): string {
+	const val = s.statActualValue?.value ?? s.statRoll;
+	if (val == null) return "—";
+	const unit = s.unit ?? "";
+	const suffix =
+		unit === "PERCENT"
+			? "%"
+			: unit === "PER_5_S"
+				? "/5s"
+				: unit === "PER_TICK"
+					? "/t"
+					: "";
+	return `${val}${suffix}`;
 }
 
 function StatCard({
@@ -157,18 +224,36 @@ function StatCard({
 
 export default function TradeItemDetailPage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ itemName: string }>;
+		searchParams: Promise<{ tier?: string }>;
 }) {
 	const { itemName } = use(params);
+	const { tier: tierParam } = use(searchParams);
 	const decodedName = decodeURIComponent(itemName);
+	const parsedTier = tierParam != null ? parseInt(tierParam, 10) : undefined;
+	const tierNum = parsedTier != null && !Number.isNaN(parsedTier) ? parsedTier : undefined;
 
-	const [itemEntry, setItemEntry] = useState<ItemEntry | null>(null);
-	const [imgError, setImgError] = useState(false);
+	const { itemDb: cachedItemDb } = useTradeMarketStore();
+	const [itemEntry, setItemEntry] = useState<ItemEntry | null>(() =>
+		cachedItemDb[decodedName] ?? null,
+	);
 	const [priceInfo, setPriceInfo] = useState<TradePriceInfo | null>(null);
 	const [history, setHistory] = useState<TradeHistoricDay[]>([]);
 	const [listings, setListings] = useState<TradeListing[]>([]);
+	const [listingsPageSize, setListingsPageSize] = useState(10);
 	const [dateRange, setDateRange] = useState<DateRange>("30d");
+	const [visibleSeries, setVisibleSeries] = useState<Set<SeriesKey>>(new Set(DEFAULT_VISIBLE));
+
+	function toggleSeries(key: SeriesKey) {
+		setVisibleSeries((prev) => {
+			const next = new Set(prev);
+			if (next.has(key)) next.delete(key);
+			else next.add(key);
+			return next;
+		});
+	}
 
 	const [loadingPrice, setLoadingPrice] = useState(true);
 	const [loadingHistory, setLoadingHistory] = useState(true);
@@ -177,65 +262,82 @@ export default function TradeItemDetailPage({
 	const [errorHistory, setErrorHistory] = useState<string | null>(null);
 	const [errorListings, setErrorListings] = useState<string | null>(null);
 
+	// Use cached itemDb immediately when navigating from list; fallback to API for direct visits
 	useEffect(() => {
+		const cached = cachedItemDb[decodedName];
+		if (cached) {
+			setItemEntry(cached);
+			return;
+		}
 		quickSearchItems(decodedName)
 			.then((db) => {
 				const entry = db[decodedName] ?? Object.values(db)[0];
 				if (entry) setItemEntry(entry);
 			})
 			.catch(() => {});
-	}, [decodedName]);
+	}, [decodedName, cachedItemDb]);
 
 	const fetchPrice = useCallback(() => {
 		setLoadingPrice(true);
 		setErrorPrice(null);
-		getTradePriceInfo(decodedName)
+		getTradePriceInfo(decodedName, tierNum != null ? { tier: tierNum } : undefined)
 			.then(setPriceInfo)
 			.catch((e) =>
 				setErrorPrice(e instanceof Error ? e.message : "Failed to load"),
 			)
 			.finally(() => setLoadingPrice(false));
-	}, [decodedName]);
+	}, [decodedName, tierNum]);
 
 	const fetchHistory = useCallback(
 		(range: DateRange) => {
 			setLoadingHistory(true);
 			setErrorHistory(null);
 			const startDate = getStartDate(range);
-			getTradeHistoricDays(
-				decodedName,
-				startDate ? { start_date: startDate } : undefined,
-			)
-			.then((data) =>
-				setHistory(
-					data.sort(
+			const historyParams =
+				startDate || tierNum != null
+					? { ...(startDate && { start_date: startDate }), ...(tierNum != null && { tier: tierNum }) }
+					: undefined;
+			getTradeHistoricDays(decodedName, historyParams)
+				.then((data) => {
+					const normalized = data.map((d) => ({
+						...d,
+						date: d.date ?? d.timestamp ?? "",
+					}));
+					return normalized.sort(
 						(a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime(),
-					),
-				),
-			)
+					);
+				})
+				.then(setHistory)
 				.catch((e) =>
 					setErrorHistory(e instanceof Error ? e.message : "Failed to load"),
 				)
 				.finally(() => setLoadingHistory(false));
 		},
-		[decodedName],
+		[decodedName, tierNum],
 	);
 
 	const fetchListings = useCallback(() => {
 		setLoadingListings(true);
 		setErrorListings(null);
-		getTradeListingsForItem(decodedName, { page: 1, page_size: 10 })
+		getTradeListingsForItem(decodedName, {
+			page: 1,
+			page_size: listingsPageSize,
+			...(tierNum != null && { tier: tierNum }),
+		})
 			.then((data) => setListings(data.items))
 			.catch((e) =>
 				setErrorListings(e instanceof Error ? e.message : "Failed to load"),
 			)
 			.finally(() => setLoadingListings(false));
-	}, [decodedName]);
+	}, [decodedName, tierNum, listingsPageSize]);
 
 	useEffect(() => {
 		fetchPrice();
+	}, [fetchPrice]);
+
+	useEffect(() => {
 		fetchListings();
-	}, [fetchPrice, fetchListings]);
+	}, [fetchListings]);
 
 	useEffect(() => {
 		fetchHistory(dateRange);
@@ -255,13 +357,8 @@ export default function TradeItemDetailPage({
 	const itemType = itemEntry?.type ?? "";
 	const itemSubType = itemEntry?.subType ?? "";
 
-	const iconName = (() => {
-		if (!itemEntry?.icon?.value) return null;
-		if (typeof itemEntry.icon.value === "string") return itemEntry.icon.value;
-		return itemEntry.icon.value.name ?? null;
-	})();
-
 	const subtitle = [
+		tierNum != null ? `Tier ${tierRoman(tierNum)}` : null,
 		itemLevel != null ? `Lv. ${itemLevel}` : null,
 		rarity ? rarity.charAt(0).toUpperCase() + rarity.slice(1) : null,
 		itemSubType
@@ -271,6 +368,9 @@ export default function TradeItemDetailPage({
 	]
 		.filter(Boolean)
 		.join(" ");
+
+	const xAxisTickFormatter = dateRange === "1d" ? formatTimeShort : formatDateShort;
+	const tooltipLabelFormatter = dateRange === "1d" ? formatDateTimeFull : formatDateFull;
 
 	return (
 		<div className="space-y-6">
@@ -293,20 +393,13 @@ export default function TradeItemDetailPage({
 			</div>
 
 			<div className="flex items-center gap-4">
-				{iconName && !imgError ? (
-					<div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40">
-						<img
-							src={wynnItemGuideUrl(iconName)}
-							alt={decodedName}
-							className="size-12 object-contain"
-							onError={() => setImgError(true)}
-						/>
-					</div>
-				) : (
-					<div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-lg text-muted-foreground">
-						?
-					</div>
-				)}
+				<div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40">
+					<ItemIcon
+						item={itemEntry ?? decodedName}
+						alt={decodedName}
+						className="size-12"
+					/>
+				</div>
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
 						<h2
@@ -387,103 +480,109 @@ export default function TradeItemDetailPage({
 
 			{/* Price history chart */}
 			<Card>
-				<CardHeader className="flex flex-row items-center justify-between pb-2">
+				<CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
 					<CardTitle className="text-sm font-medium">Price History</CardTitle>
-					<Select
-						value={dateRange}
-						onValueChange={(v) => setDateRange(v as DateRange)}
-					>
-						<SelectTrigger className="w-[100px]">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="7d">7 days</SelectItem>
-							<SelectItem value="30d">30 days</SelectItem>
-							<SelectItem value="90d">90 days</SelectItem>
-							<SelectItem value="all">All time</SelectItem>
-						</SelectContent>
-					</Select>
+					{/* Series toggles */}
+					<div className="flex flex-wrap gap-1.5">
+						{ALL_SERIES.map((key) => {
+							const cfg = chartConfig[key];
+							const active = visibleSeries.has(key);
+							return (
+								<button
+									key={key}
+									type="button"
+									onClick={() => toggleSeries(key)}
+									className={cn(
+										"flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-mono transition-opacity",
+										active ? "opacity-100" : "opacity-40",
+									)}
+									style={{ borderColor: cfg.color, color: active ? cfg.color : undefined }}
+								>
+									<span
+										className="size-2 rounded-full shrink-0"
+										style={{ background: cfg.color }}
+									/>
+									{cfg.label}
+								</button>
+							);
+						})}
+					</div>
 				</CardHeader>
-				<CardContent>
+				<CardContent className="space-y-3">
+
+
 					{errorHistory && <ErrorBanner message={errorHistory} />}
 
 					{loadingHistory ? (
-						<Skeleton className="h-[300px] rounded-lg" />
+						<Skeleton className="h-[320px] rounded-lg" />
 					) : history.length > 0 ? (
-						<ChartContainer
-							config={chartConfig}
-							className="aspect-auto h-[300px] w-full"
-						>
-							<AreaChart
+							<ChartContainer config={chartConfig} className="aspect-auto h-[320px] w-full">
+								<ComposedChart
 								data={history}
-								margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+									margin={{ top: 4, right: visibleSeries.has("total_count") ? 50 : 4, bottom: 0, left: 0 }}
 							>
 								<defs>
 									<linearGradient id="fillAvg" x1="0" y1="0" x2="0" y2="1">
-										<stop
-											offset="5%"
-											stopColor="var(--color-average_price)"
-											stopOpacity={0.3}
-										/>
-										<stop
-											offset="95%"
-											stopColor="var(--color-average_price)"
-											stopOpacity={0}
-										/>
+											<stop offset="5%" stopColor="var(--color-average_price)" stopOpacity={0.25} />
+											<stop offset="95%" stopColor="var(--color-average_price)" stopOpacity={0} />
 									</linearGradient>
 									<linearGradient id="fillMid80" x1="0" y1="0" x2="0" y2="1">
-										<stop
-											offset="5%"
-											stopColor="var(--color-average_mid_80_percent_price)"
-											stopOpacity={0.3}
-										/>
-										<stop
-											offset="95%"
-											stopColor="var(--color-average_mid_80_percent_price)"
-											stopOpacity={0}
-										/>
+											<stop offset="5%" stopColor="var(--color-average_mid_80_percent_price)" stopOpacity={0.25} />
+											<stop offset="95%" stopColor="var(--color-average_mid_80_percent_price)" stopOpacity={0} />
 									</linearGradient>
 								</defs>
-								<CartesianGrid
-									strokeDasharray="3 3"
-									className="stroke-border/30"
-								/>
-								<XAxis
-									dataKey="date"
-									tickFormatter={formatDateShort}
-									tick={{ fontSize: 11 }}
-									tickLine={false}
-									axisLine={false}
-								/>
-								<YAxis
-									tickFormatter={formatPrice}
-									tick={{ fontSize: 11 }}
-									tickLine={false}
-									axisLine={false}
-									width={55}
-								/>
+									<CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
+									<XAxis dataKey="date" tickFormatter={xAxisTickFormatter} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+									<YAxis yAxisId="price" tickFormatter={formatPrice} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={55} />
+									{visibleSeries.has("total_count") && (
+										<YAxis
+											yAxisId="volume"
+											orientation="right"
+											tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
+											tick={{ fontSize: 11 }}
+											tickLine={false}
+											axisLine={false}
+											width={45}
+										/>
+									)}
 								<ChartTooltip
 									content={
 										<ChartTooltipContent
-											labelFormatter={(v) => formatDateFull(String(v))}
+												labelFormatter={(v) => tooltipLabelFormatter(String(v))}
+												formatter={(value, name) => {
+													const cfg = chartConfig[name as SeriesKey];
+													return (
+														<>
+															<span className="text-muted-foreground">{cfg?.label ?? String(name)}</span>
+															{name === "total_count"
+																? <span>{Number(value).toLocaleString()} sales</span>
+																: <EmeraldPrice price={Number(value)} />
+															}
+														</>
+													);
+												}}
 										/>
 									}
 								/>
-								<Area
-									type="monotone"
-									dataKey="average_price"
-									stroke="var(--color-average_price)"
-									fill="url(#fillAvg)"
-									strokeWidth={2}
-								/>
-								<Area
-									type="monotone"
-									dataKey="average_mid_80_percent_price"
-									stroke="var(--color-average_mid_80_percent_price)"
-									fill="url(#fillMid80)"
-									strokeWidth={2}
-								/>
-							</AreaChart>
+									{visibleSeries.has("total_count") && (
+										<Bar yAxisId="volume" dataKey="total_count" fill="var(--color-total_count)" fillOpacity={0.3} radius={[2, 2, 0, 0]} />
+									)}
+									{visibleSeries.has("average_price") && (
+										<Area yAxisId="price" type="monotone" dataKey="average_price" stroke="var(--color-average_price)" fill="url(#fillAvg)" strokeWidth={2} dot={false} />
+									)}
+									{visibleSeries.has("average_mid_80_percent_price") && (
+										<Area yAxisId="price" type="monotone" dataKey="average_mid_80_percent_price" stroke="var(--color-average_mid_80_percent_price)" fill="url(#fillMid80)" strokeWidth={2} dot={false} />
+									)}
+									{visibleSeries.has("highest_price") && (
+										<Line yAxisId="price" type="monotone" dataKey="highest_price" stroke="var(--color-highest_price)" strokeWidth={1.5} dot={false} />
+									)}
+									{visibleSeries.has("lowest_price") && (
+										<Line yAxisId="price" type="monotone" dataKey="lowest_price" stroke="var(--color-lowest_price)" strokeWidth={1.5} dot={false} />
+									)}
+									{visibleSeries.has("unidentified_average_price") && (
+										<Line yAxisId="price" type="monotone" dataKey="unidentified_average_price" stroke="var(--color-unidentified_average_price)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+									)}
+								</ComposedChart>
 						</ChartContainer>
 					) : (
 						<p className="py-12 text-center text-sm text-muted-foreground">
@@ -491,110 +590,184 @@ export default function TradeItemDetailPage({
 						</p>
 					)}
 
-					{!loadingHistory && history.length > 1 && (
-						<div className="mt-4">
-							<p className="mb-2 text-xs font-medium text-muted-foreground">
-								Price Range (High / Low)
-							</p>
-							<ChartContainer
-								config={chartConfig}
-								className="aspect-auto h-[180px] w-full"
+					<div className="flex flex-wrap justify-center gap-1 pt-3 mx-auto">
+						{(["7d", "30d", "90d"] as const).map((range) => (
+							<button
+								key={range}
+								type="button"
+								onClick={() => setDateRange(range)}
+								className={cn(
+									"rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+									dateRange === range
+										? "border-primary bg-primary/20 text-primary"
+										: "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+								)}
 							>
-								<LineChart
-									data={history}
-									margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
-								>
-									<CartesianGrid
-										strokeDasharray="3 3"
-										className="stroke-border/30"
-									/>
-									<XAxis
-										dataKey="date"
-										tickFormatter={formatDateShort}
-										tick={{ fontSize: 11 }}
-										tickLine={false}
-										axisLine={false}
-									/>
-									<YAxis
-										tickFormatter={formatPrice}
-										tick={{ fontSize: 11 }}
-										tickLine={false}
-										axisLine={false}
-										width={55}
-									/>
-									<ChartTooltip
-										content={
-											<ChartTooltipContent
-												labelFormatter={(v) => formatDateFull(String(v))}
-											/>
-										}
-									/>
-									<Line
-										type="monotone"
-										dataKey="highest_price"
-										stroke="var(--color-highest_price)"
-										strokeWidth={1.5}
-										dot={false}
-									/>
-									<Line
-										type="monotone"
-										dataKey="lowest_price"
-										stroke="var(--color-lowest_price)"
-										strokeWidth={1.5}
-										dot={false}
-									/>
-								</LineChart>
-							</ChartContainer>
-						</div>
-					)}
+								{range === "7d" ? "7 days" : range === "30d" ? "30 days" : "90 days"}
+							</button>
+						))}
+					</div>
 				</CardContent>
 			</Card>
 
 			{/* Recent listings */}
 			<Card>
 				<CardHeader className="pb-2">
-					<CardTitle className="text-sm font-medium">Recent Listings</CardTitle>
+					<div className="flex items-center justify-between gap-2">
+						<CardTitle className="text-sm font-medium">
+							Recent Listings
+						</CardTitle>
+						<div className="flex items-center gap-2">
+							<Select
+								value={String(listingsPageSize)}
+								onValueChange={(v) => setListingsPageSize(Number(v))}
+							>
+								<SelectTrigger size="sm" className="h-8 w-[72px]">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="10">10</SelectItem>
+									<SelectItem value="25">25</SelectItem>
+									<SelectItem value="50">50</SelectItem>
+								</SelectContent>
+							</Select>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="size-8 shrink-0"
+								onClick={fetchListings}
+								disabled={loadingListings}
+								title="Refresh listings"
+							>
+								{loadingListings ? (
+									<Loader2 className="size-4 animate-spin" />
+								) : (
+									<RefreshCw className="size-4" />
+								)}
+							</Button>
+						</div>
+					</div>
 				</CardHeader>
 				<CardContent>
 					{errorListings && <ErrorBanner message={errorListings} />}
 
 					{loadingListings ? (
 						<div className="space-y-2">
-							{Array.from({ length: 5 }).map((_, i) => (
+							{Array.from({ length: listingsPageSize }).map((_, i) => (
 								<Skeleton key={i} className="h-12 rounded-md" />
 							))}
 						</div>
 					) : listings.length > 0 ? (
-						<div className="divide-y divide-border/30">
-							{listings.map((l) => (
-								<div
-									key={`${l.hash_code}-${l.timestamp}`}
-									className="flex items-center justify-between gap-3 py-2.5"
-								>
-									<div className="flex items-center gap-2 min-w-0">
-										<span className="text-sm truncate">
-											{l.amount > 1 && (
-												<span className="text-muted-foreground mr-1 tabular-nums">
-													{l.amount}x
-												</span>
-											)}
-											{l.name}
-										</span>
-										{l.unidentified && (
-											<Badge variant="outline" className="text-[9px] shrink-0">
-												Unid
-											</Badge>
-										)}
-									</div>
-									<div className="flex items-center gap-3 shrink-0">
-										<EmeraldPrice price={l.listing_price} />
-										<span className="text-[10px] text-muted-foreground">
-											{l.timestamp}
-										</span>
-									</div>
-								</div>
-							))}
-						</div>
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Item</TableHead>
+										<TableHead className="text-right">Roll</TableHead>
+										<TableHead className="text-right">Price</TableHead>
+										<TableHead className="text-right">Time</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{listings.map((l) => (
+										<TableRow key={`${l.hash_code}-${l.timestamp}`}>
+											<TableCell className="whitespace-normal align-top max-w-[280px]">
+												<div className="flex items-start gap-2">
+													<ItemIcon
+														item={l.icon?.value ?? l.name}
+														alt={l.name}
+														className="size-8 shrink-0"
+													/>
+													<div className="min-w-0 ">
+														<div className="flex items-center gap-1.5 flex-wrap">
+															{l.amount > 1 && (
+																<span className="text-muted-foreground text-xs tabular-nums shrink-0">
+																	{l.amount}x
+																</span>
+															)}
+															<span
+																className={cn(
+																	"text-sm font-medium",
+																	l.rarity ? RARITY_COLORS[l.rarity] : ""
+																)}
+															>
+																{l.name}
+															</span>
+															{l.unidentified && (
+																<Badge variant="outline" className="text-[9px] shrink-0">
+																	Unid
+																</Badge>
+															)}
+															{l.rarity && (
+																<Badge
+																	variant="outline"
+																	className={cn(
+																		"text-[9px] shrink-0",
+																		RARITY_BADGE[l.rarity] ?? ""
+																	)}
+																>
+																	{l.rarity}
+																</Badge>
+															)}
+															{l.type && (
+																<span className="text-[10px] text-muted-foreground shrink-0">
+																	{l.type}
+																</span>
+															)}
+															{l.tier != null && (
+																<Badge variant="secondary" className="text-[9px] shrink-0">
+																	{tierRoman(l.tier)}
+																</Badge>
+															)}
+														</div>
+														{l.stat_rolls != null && l.stat_rolls.length > 0 && (
+															<div className="flex flex-wrap gap-1 mt-1">
+																{[...l.stat_rolls]
+																	.sort((a, b) => (b.stars ?? 0) - (a.stars ?? 0))
+																	.map((s, i) => (
+																		<span
+																			key={s.apiName ?? i}
+																			className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[10px]"
+																		>
+																			<span className="text-muted-foreground capitalize">
+																				{s.displayName ?? s.apiName ?? "—"}
+																			</span>
+																			<span className="tabular-nums">
+																				{formatStatRollValue(s)}
+																			</span>
+																			{s.stars != null && s.stars > 0 && (
+																				<span className="text-amber-500" title={`${s.stars} star${s.stars !== 1 ? "s" : ""}`}>
+																					{"★".repeat(s.stars)}
+																				</span>
+																			)}
+																		</span>
+																	))}
+															</div>
+														)}
+													</div>
+												</div>
+											</TableCell>
+											<TableCell className="text-right tabular-nums">
+												{!l.unidentified && l.overall_roll != null && l.overall_roll > 0 ? (
+													<span className="text-muted-foreground">
+														{l.overall_roll.toFixed(1)}%
+														{l.reroll_count != null && l.reroll_count > 0 && (
+															<span className="text-xs"> x{l.reroll_count}</span>
+														)}
+													</span>
+												) : (
+													<span className="text-muted-foreground">—</span>
+												)}
+											</TableCell>
+											<TableCell className="text-right">
+												<EmeraldPrice price={l.listing_price} />
+											</TableCell>
+											<TableCell className="text-right text-muted-foreground text-[10px]">
+												{formatTimeElapsed(l.timestamp)}
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
 					) : (
 						<p className="py-8 text-center text-sm text-muted-foreground">
 							No active listings found.
@@ -602,6 +775,146 @@ export default function TradeItemDetailPage({
 					)}
 				</CardContent>
 			</Card>
+
+			{/* Item details */}
+			{itemEntry && (
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-sm font-medium">Item Details</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-4">
+						{/* Basic info */}
+						<div className="grid gap-2 text-sm sm:grid-cols-2">
+							{itemEntry.type && (
+								<div>
+									<span className="text-muted-foreground">Type</span>
+									<p className="capitalize">
+										{(itemEntry as { weaponType?: string }).weaponType
+											? `${(itemEntry as { weaponType?: string }).weaponType} ${itemEntry.type}`
+											: itemEntry.subType
+												? `${itemEntry.subType} ${itemEntry.type}`
+												: itemEntry.type.replace(/([A-Z])/g, " $1").trim()}
+									</p>
+								</div>
+							)}
+							{itemEntry.attackSpeed && (
+								<div>
+									<span className="text-muted-foreground">Attack Speed</span>
+									<p className="capitalize">
+										{itemEntry.attackSpeed.replace(/([A-Z])/g, " $1").trim()}
+									</p>
+								</div>
+							)}
+							{itemEntry.averageDPS != null && (
+								<div>
+									<span className="text-muted-foreground">Avg DPS</span>
+									<p>{itemEntry.averageDPS.toLocaleString()}</p>
+								</div>
+							)}
+							{itemEntry.powderSlots != null && (
+								<div>
+									<span className="text-muted-foreground">Powder Slots</span>
+									<p>{itemEntry.powderSlots}</p>
+								</div>
+							)}
+							{itemEntry.dropRestriction && (
+								<div>
+									<span className="text-muted-foreground">Drop</span>
+									<p className="capitalize">{itemEntry.dropRestriction}</p>
+								</div>
+							)}
+						</div>
+
+						{/* Requirements */}
+						{itemEntry.requirements && Object.keys(itemEntry.requirements).length > 0 && (
+							<div>
+								<p className="mb-2 text-xs font-medium text-muted-foreground">Requirements</p>
+								<div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+									{itemEntry.requirements.level != null && (
+										<span>Lv. {itemEntry.requirements.level}</span>
+									)}
+									{(itemEntry.requirements.class_requirement ?? (itemEntry.requirements as { classRequirement?: string }).classRequirement) && (
+										<span className="capitalize">
+											{(itemEntry.requirements.class_requirement ?? (itemEntry.requirements as { classRequirement?: string }).classRequirement)?.replace(/_/g, " ")}
+										</span>
+									)}
+									{itemEntry.requirements.strength != null && (
+										<span>Str {itemEntry.requirements.strength}</span>
+									)}
+									{itemEntry.requirements.dexterity != null && (
+										<span>Dex {itemEntry.requirements.dexterity}</span>
+									)}
+									{itemEntry.requirements.intelligence != null && (
+										<span>Int {itemEntry.requirements.intelligence}</span>
+									)}
+									{itemEntry.requirements.defence != null && (
+										<span>Def {itemEntry.requirements.defence}</span>
+									)}
+									{itemEntry.requirements.agility != null && (
+										<span>Agi {itemEntry.requirements.agility}</span>
+									)}
+								</div>
+							</div>
+						)}
+
+						{/* Base stats */}
+						{itemEntry.base && Object.keys(itemEntry.base).length > 0 && (
+							<div>
+								<p className="mb-2 text-xs font-medium text-muted-foreground">Base</p>
+								<div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+									{Object.entries(itemEntry.base).map(([key, val]) => {
+										if (val == null) return null;
+										const v = val as { min?: number; max?: number; raw?: number };
+										if (typeof v === "object" && "min" in v && "max" in v) {
+											const label = key.replace(/^base/, "").replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+											return (
+												<span key={key}>
+													{label}: {v.min}–{v.max}
+												</span>
+											);
+										}
+										return null;
+									})}
+								</div>
+							</div>
+						)}
+
+						{/* Identifications */}
+						{itemEntry.identifications && Object.keys(itemEntry.identifications).length > 0 && (
+							<div>
+								<p className="mb-2 text-xs font-medium text-muted-foreground">Identifications</p>
+								<div className="grid gap-1.5 text-sm sm:grid-cols-2">
+									{Object.entries(itemEntry.identifications).map(([key, val]) => {
+										const id = val as number | ItemIdentification;
+										const isRange = typeof id === "object" && id != null && "min" in id && "max" in id;
+										const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+										return (
+											<div key={key} className="flex justify-between gap-2">
+												<span className="text-muted-foreground capitalize">{label}</span>
+												<span className="tabular-nums">
+													{isRange
+														? `${(id as ItemIdentification).min} ~ ${(id as ItemIdentification).raw} ~ ${(id as ItemIdentification).max}`
+														: String(id)}
+												</span>
+											</div>
+										);
+									})}
+								</div>
+							</div>
+						)}
+
+						{/* Lore */}
+						{itemEntry.lore && (
+							<div>
+								<p className="mb-2 text-xs font-medium text-muted-foreground">Lore</p>
+								<p className="text-sm italic text-muted-foreground leading-relaxed">
+									{itemEntry.lore}
+								</p>
+							</div>
+						)}
+					</CardContent>
+				</Card>
+			)}
 		</div>
 	);
 }
