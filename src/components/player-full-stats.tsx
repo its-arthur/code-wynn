@@ -78,7 +78,7 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
 							/>
 						)}
 						<span
-							className="font-minecraft inline-block px-1.5 py-0.5 text-2xl text-[#ffff55]"
+							className="font-minecraft inline-block px-1.5 py-0.5 text-2xl text-unique"
 							style={{
 								textShadow:
 									"1px 1px 0 #3f3f3f, -1px -1px 0 #3f3f3f, 1px -1px 0 #3f3f3f, -1px 1px 0 #3f3f3f",

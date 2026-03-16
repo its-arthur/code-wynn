@@ -28,7 +28,7 @@ export function Navbar() {
 	};
 
 	return (
-		<header className="sticky top-0 z-50 w-full border-b border-border/40 bg-gradient-to-b from-background/80 via-transparent to-transparent backdrop-blur-md">
+		<header className="sticky top-0 z-50 w-full border-b border-border/40 bg-linear-to-b from-background/80 via-transparent to-transparent backdrop-blur-md">
 			<nav className="mx-auto flex h-14 max-w-6xl items-center justify-center gap-1 px-4">
 				{navItems.map(({ href, label, icon: Icon }) => {
 					const active = isActive(href);
