@@ -2,6 +2,8 @@
  * Proxy for Wynncraft Player API. Forwards GET to api.wynncraft.com/v3/player
  * so the frontend can avoid CORS. API key is sent server-side only (WYNN_API_KEY).
  */
+import { CACHE, jsonWithCache } from "@/lib/api-cache";
+
 const UPSTREAM = "https://api.wynncraft.com/v3/player";
 
 export async function GET(
@@ -28,5 +30,5 @@ export async function GET(
   }
 
   const data = await res.json();
-  return Response.json(data);
+  return jsonWithCache(data, CACHE.player);
 }

@@ -34,3 +34,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### Staying on the free tier
+
+This project is tuned to stay within Vercel’s Hobby (free) limits:
+
+- **API caching**: All API routes use `Cache-Control` headers so Vercel Edge caches responses. This cuts serverless invocations and bandwidth.
+- **Images**: `images.unoptimized: true` in `next.config.ts` avoids the 1,000 image optimization limit.
+- **Function timeout**: API routes use a 10s max duration (free tier default).
+
+Free tier limits: 1M function invocations/month, 100 GB bandwidth, 6,000 build minutes. Caching keeps usage low for typical traffic.

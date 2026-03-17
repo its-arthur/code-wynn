@@ -2,6 +2,8 @@
  * Proxy for Wynncraft News API. Forwards GET to api.wynncraft.com/v3/news
  * so the frontend can avoid CORS.
  */
+import { CACHE, jsonWithCache } from "@/lib/api-cache";
+
 const UPSTREAM = "https://api.wynncraft.com/v3/latest-news";
 
 export async function GET(
@@ -31,5 +33,5 @@ export async function GET(
   }
 
   const data = await res.json();
-  return Response.json(data);
+  return jsonWithCache(data, CACHE.static);
 }

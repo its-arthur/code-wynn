@@ -2,6 +2,8 @@
  * Shared proxy logic for Wynnventory API routes.
  * Auth: Api-Key header from WYNNVENTORY_API_KEY env var.
  */
+import { CACHE, jsonWithCache } from "@/lib/api-cache";
+
 const UPSTREAM_BASE = "https://www.wynnventory.com/api";
 
 export function buildUpstreamUrl(
@@ -39,5 +41,5 @@ export async function proxyGet(
 	}
 
 	const data = await res.json();
-	return Response.json(data);
+	return jsonWithCache(data, CACHE.market);
 }

@@ -3,6 +3,8 @@
  * so the frontend can avoid CORS. API key is sent server-side only (WYNN_API_KEY).
  * @see https://docs.wynncraft.com/docs/modules/ability.html
  */
+import { CACHE, jsonWithCache } from "@/lib/api-cache";
+
 const UPSTREAM = "https://api.wynncraft.com/v3/ability";
 
 export async function GET(
@@ -32,5 +34,5 @@ export async function GET(
   }
 
   const data = await res.json();
-  return Response.json(data);
+  return jsonWithCache(data, CACHE.static);
 }
