@@ -17,7 +17,7 @@ interface RegionCardProps {
 	items?: WynnventoryItem[];
 	groups?: LootItemGroup[];
 	itemDb?: Record<string, ItemEntry>;
-	onItemClick?: (name: string) => void;
+	onItemClick?: (completedData: CompletedData) => void;
 }
 
 const RARITY_ORDER = [
@@ -89,23 +89,26 @@ export function RegionCard({
 
 	return (
 		<div className="rounded-lg border border-border/50 bg-card max-w-4xl mx-auto">
-			<div className="px-4 py-3">
+			{/* <div className="px-4 py-3">
 				<h3 className="font-semibold text-sm">{region}</h3>
 				{timestamp && (
 					<p className="text-[11px] text-muted-foreground">{timestamp}</p>
 				)}
-			</div>
+			</div> */}
 
 			<div className="border-t border-border/30 px-4 pb-4 pt-3">
 				{items && (
 					<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-						{sortByRarity(items).map((item, i) => (
-							<RaidItem
-								key={`${item.name}-${i}`}
-								completedData={toCompletedData(item)}
-								onClick={onItemClick ? () => onItemClick(item.name) : undefined}
-							/>
-						))}
+						{sortByRarity(items).map((item, i) => {
+							const data = toCompletedData(item);
+							return (
+								<RaidItem
+									key={`${item.name}-${i}`}
+									completedData={data}
+									onClick={onItemClick ? () => onItemClick(data) : undefined}
+								/>
+							);
+						})}
 					</div>
 				)}
 
@@ -117,13 +120,16 @@ export function RegionCard({
 									{group.group}
 								</h4>
 								<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-									{group.loot_items.map((item, i) => (
-										<RaidItem
-											key={`${item.name}-${i}`}
-											completedData={toCompletedDataFromGrouped(item)}
-											onClick={onItemClick ? () => onItemClick(item.name) : undefined}
-										/>
-									))}
+									{group.loot_items.map((item, i) => {
+										const data = toCompletedDataFromGrouped(item);
+										return (
+											<RaidItem
+												key={`${item.name}-${i}`}
+												completedData={data}
+												onClick={onItemClick ? () => onItemClick(data) : undefined}
+											/>
+										);
+									})}
 								</div>
 							</div>
 						))}

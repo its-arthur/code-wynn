@@ -1187,12 +1187,12 @@ export default function TradeItemDetailPage({
 										{itemEntry.requirements.level != null && (
 											<span>Lv. {itemEntry.requirements.level}</span>
 										)}
-										{(itemEntry.requirements.class_requirement ??
+									{(itemEntry.requirements.classRequirement ??
 											(itemEntry.requirements as { classRequirement?: string })
 												.classRequirement) && (
 											<span className="capitalize">
 												{(
-													itemEntry.requirements.class_requirement ??
+												itemEntry.requirements.classRequirement ??
 													(
 														itemEntry.requirements as {
 															classRequirement?: string;

@@ -62,7 +62,8 @@ export function LootrunsContent({
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
 	const [itemInfoOpen, setItemInfoOpen] = useState(false);
-	const [itemInfoName, setItemInfoName] = useState("");
+	const [itemInfoCompletedData, setItemInfoCompletedData] =
+		useState<CompletedData | null>(null);
 
 	useEffect(() => {
 		getItemDatabaseFull().then(setItemDb).catch(() => {});
@@ -109,17 +110,18 @@ export function LootrunsContent({
 		return () => clearInterval(id);
 	}, [grouped, fetchGrouped]);
 
-	const openItemInfo = useCallback((name: string) => {
-		setItemInfoName(name);
+	const openItemInfo = useCallback((completedData: CompletedData) => {
+		setItemInfoCompletedData(completedData);
 		setItemInfoOpen(true);
 	}, []);
 
 	return (
 		<div className="space-y-4">
+			
 			<ItemInfo
 				open={itemInfoOpen}
 				onOpenChange={setItemInfoOpen}
-				name={itemInfoName}
+				completedData={itemInfoCompletedData}
 			/>
 			{error && <ErrorBanner message={error} />}
 
@@ -187,7 +189,7 @@ function ShinyCarousel({
 	itemDb: ItemDatabase;
 	selectedRegion: string;
 	onRegionSelect: (region: string) => void;
-		onItemInfoClick?: (name: string) => void;
+		onItemInfoClick?: (completedData: CompletedData) => void;
 }) {
 	const [api, setApi] = useState<CarouselApi | null>(null);
 	const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -287,10 +289,10 @@ function ShinyItemCard({
 	toCompletedData: (item: GroupedLootItem) => CompletedData;
 	isActive: boolean;
 	onClick: () => void;
-		onItemInfoClick?: (name: string) => void;
+		onItemInfoClick?: (completedData: CompletedData) => void;
 }) {
-	const { wynn } = toCompletedData(item);
-	const iconItem = wynn ?? item.icon?.value ?? item.name;
+	const completedData = toCompletedData(item);
+	const iconItem = completedData.wynn ?? item.icon?.value ?? item.name;
 	const rarity = item.rarity.toLowerCase();
 	const rarityFormatted =
 		item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1).toLowerCase();
@@ -319,7 +321,7 @@ function ShinyItemCard({
 						type="button"
 						onClick={(e) => {
 							e.stopPropagation();
-							onItemInfoClick(item.name);
+							onItemInfoClick(completedData);
 						}}
 						className="absolute top-2 right-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
 						aria-label="View item info"

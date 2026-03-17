@@ -9,6 +9,7 @@ import { RegionCard } from "@/components/raidpool/region-card";
 import { getItemDatabaseFull } from "@/api/item";
 import { getRaidRewardsGrouped } from "@/api/wynnventory/raidpool";
 import type { ItemDatabase } from "@/types/item";
+import type { CompletedData } from "@/components/raidpool/region-card";
 import type { RaidGroupedRegion } from "@/types/wynnventory/raidpool";
 import { Separator } from "@/components/ui/separator";
 import { ItemInfo } from "@/components/item-info";
@@ -45,7 +46,8 @@ export function RaidsContent({
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
 	const [itemInfoOpen, setItemInfoOpen] = useState(false);
-	const [itemInfoName, setItemInfoName] = useState("");
+	const [itemInfoCompletedData, setItemInfoCompletedData] =
+		useState<CompletedData | null>(null);
 
 	useEffect(() => {
 		getItemDatabaseFull().then(setItemDb).catch(() => {});
@@ -92,8 +94,8 @@ export function RaidsContent({
 		return () => clearInterval(id);
 	}, [grouped, fetchGrouped]);
 
-	const openItemInfo = useCallback((name: string) => {
-		setItemInfoName(name);
+	const openItemInfo = useCallback((completedData: CompletedData) => {
+		setItemInfoCompletedData(completedData);
 		setItemInfoOpen(true);
 	}, []);
 
@@ -102,7 +104,7 @@ export function RaidsContent({
 			<ItemInfo
 				open={itemInfoOpen}
 				onOpenChange={setItemInfoOpen}
-				name={itemInfoName}
+				completedData={itemInfoCompletedData}
 			/>
 			{error && <ErrorBanner message={error} />}
 
@@ -173,14 +175,20 @@ function RaidsLoadingSkeleton() {
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-col items-center justify-center gap-2">
+				<Skeleton className="h-8 w-48 rounded" />
 				<Skeleton className="size-56 rounded-lg" />
-				<div className="flex gap-2">
+			</div>
+			<div className="my-6 max-w-4xl mx-auto">
+				<Skeleton className="h-px w-full" />
+			</div>
+			<div className="w-full">
+				<div className="flex gap-2 justify-center ">
 					{["NOTG", "NOL", "TCC", "TNA"].map((label) => (
 						<Skeleton key={label} className="h-9 w-16 rounded-md" />
 					))}
 				</div>
-				<Skeleton className="h-8 w-48 rounded" />
 			</div>
+
 			<div className="rounded-lg border border-border/50 bg-card max-w-4xl mx-auto overflow-hidden">
 				<div className="px-4 py-3 space-y-2">
 					<Skeleton className="h-4 w-24" />

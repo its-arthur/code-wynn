@@ -28,8 +28,6 @@ import type {
 	PlayerCharacterData,
 } from "@/types/player";
 import type { AbilityTreeResponse, AbilityMapEntry } from "@/types/ability";
-import { BlobDecoration } from "./blob-decoration";
-import { DotGridDecoration } from "./dot-grid-decoration";
 
 const FIXED_LOCALE = "en-US";
 
@@ -474,24 +472,6 @@ export function PlayerFullStatsContent({
 
 	return (
 		<div className="w-full relative">
-			<DotGridDecoration dotOpacity={0.12} dotSpacing={14} showCorners />
-			<BlobDecoration
-				greenSize={300}
-				yellowSize={400}
-				greenOpacity={0.4}
-				yellowOpacity={0.4}
-				greenOffsetX={100}
-				greenOffsetY={150}
-				yellowOffsetX={-50}
-				yellowOffsetY={-150}
-				swapPositions={true}
-			/>
-			<BlobDecoration
-				greenSize={400}
-				yellowSize={500}
-				greenOpacity={0.2}
-				yellowOpacity={0.2}
-			/>
 			{/* Overview panel */}
 			<section className="rounded-xl border border-border/80 bg-card/50 p-4 shadow-sm backdrop-blur-sm sm:p-6">
 				<div className="grid gap-6 sm:grid-cols-2">

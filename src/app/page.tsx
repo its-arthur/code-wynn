@@ -10,8 +10,6 @@ import { PlayerSkin } from "@/components/player-skin";
 import { FEATURED_USERNAMES } from "@/data/featured-users";
 import type { PlayerMainStats, PlayerMainStatsResponse } from "@/types/player";
 import { ArticlesSection } from "@/components/articles-section";
-import { BlobDecoration } from "@/components/blob-decoration";
-import { DotGridDecoration } from "@/components/dot-grid-decoration";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 
@@ -227,7 +225,6 @@ export default function MainPage() {
 	return (
 		<div className="min-h-screen bg-background py-8 px-4">
 			<main className="relative flex min-h-screen flex-col gap-4 items-center justify-center">
-				<DotGridDecoration dotOpacity={0.12} dotSpacing={28} showCorners />
 
 				<div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full max-w-7xl mx-auto">
 					{FEATURED_USERNAMES.map((username) => (
@@ -248,23 +245,6 @@ export default function MainPage() {
 							className="h-96 w-96 shrink-0 object-contain sm:h-96 sm:w-96"
 						/>
 					</div>
-					<BlobDecoration
-						greenSize={300}
-						yellowSize={400}
-						greenOpacity={0.4}
-						yellowOpacity={0.4}
-						greenOffsetX={100}
-						greenOffsetY={150}
-						yellowOffsetX={-50}
-						yellowOffsetY={-150}
-						swapPositions={true}
-					/>
-					<BlobDecoration
-						greenSize={400}
-						yellowSize={500}
-						greenOpacity={0.2}
-						yellowOpacity={0.2}
-					/>
 				</div>
 
 				<Button
