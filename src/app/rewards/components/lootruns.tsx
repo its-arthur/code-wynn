@@ -316,22 +316,9 @@ function ShinyItemCard({
 			)}
 		>
 			<CardContent className="flex flex-col items-center gap-3 p-4 relative">
-				{onItemInfoClick && (
-					<button
-						type="button"
-						onClick={(e) => {
-							e.stopPropagation();
-							onItemInfoClick(completedData);
-						}}
-						className="absolute top-2 right-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-						aria-label="View item info"
-					>
-						<Info className="size-4" />
-					</button>
-				)}
 				<span
 					className={cn(
-						"flex shrink-0 overflow-hidden rounded-lg border-2",
+						"flex shrink-0 overflow-hidden rounded-lg border-2 relative",
 						border.split(" ")[0],
 					)}
 				>
@@ -340,6 +327,19 @@ function ShinyItemCard({
 						alt={item.name}
 						className="size-16 sm:size-32 p-4"
 					/>
+					{onItemInfoClick && (
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							onItemInfoClick(completedData);
+						}}
+							className="absolute bottom-2 right-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+						aria-label="View item info"
+					>
+						<Info className="size-4" />
+						</button>
+					)}
 				</span>
 				<Badge
 					variant="outline"
