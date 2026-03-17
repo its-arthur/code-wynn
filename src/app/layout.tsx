@@ -10,6 +10,7 @@ import {
 import { GeistSans } from "geist/font/sans";
 import { DisableZoomHandler } from "@/components/disable-zoom-handler";
 import { Footer } from "@/components/footer";
+import { MountLoadingScreen } from "@/components/mount-loading-screen";
 import { Navbar } from "@/components/navbar";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -41,6 +42,7 @@ export default function RootLayout({
 				suppressHydrationWarning
 			>
 				<DisableZoomHandler />
+				<MountLoadingScreen />
 				<Navbar />
 				<main className="flex-1">{children}</main>
 				<Footer />
