@@ -12,6 +12,7 @@ export function Footer() {
 						Developed by{" "}
 						<Link
 							href="https://port-arthur.vercel.app/"
+							target="_blank"
 							className="text-white transition-colors hover:text-foreground"
 						>
 							Arthur
@@ -21,6 +22,7 @@ export function Footer() {
 						Data from{" "}
 						<Link
 							href="https://docs.wynncraft.com/docs/"
+							target="_blank"
 							className="text-white transition-colors hover:text-foreground"
 						>
 							Wynncraft API
@@ -28,6 +30,7 @@ export function Footer() {
 						{" · "}
 						<Link
 							href="https://github.com/Wynnventory/WynnVentory_Mod"
+							target="_blank"
 							className="text-white transition-colors hover:text-foreground"
 						>
 							WynnVentory
