@@ -1,26 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppReady } from "@/contexts/app-ready-context";
 
 const FADE_DURATION_MS = 400;
 
 export function MountLoadingScreen() {
 	const [phase, setPhase] = useState<"visible" | "fading" | "gone">("visible");
 	const elRef = useRef<HTMLDivElement>(null);
+	const { ready } = useAppReady();
 
 	const handleTransitionEnd = useCallback(() => {
 		setPhase("gone");
 	}, []);
 
 	useEffect(() => {
+		if (!ready) return;
 		const startFade = () => setPhase("fading");
 		const id = requestAnimationFrame(() => {
 			requestAnimationFrame(startFade);
 		});
 		return () => cancelAnimationFrame(id);
-	}, []);
+	}, [ready]);
 
 	useEffect(() => {
 		if (phase !== "fading") return;

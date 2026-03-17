@@ -12,6 +12,7 @@ import { FEATURED_USERNAMES } from "@/data/featured-users";
 import type { PlayerMainStats, PlayerMainStatsResponse } from "@/types/player";
 import { ArticlesSection } from "@/components/articles-section";
 import { Button } from "@/components/ui/button";
+import { useAppReady } from "@/contexts/app-ready-context";
 import { RefreshCw } from "lucide-react";
 
 function isMainStats(data: PlayerMainStatsResponse): data is PlayerMainStats {
@@ -63,7 +64,7 @@ function FeaturedPlayerSection({
 							</span>
 						</p>
 
-						<div className="flex flex-col gap-4">
+						<div className="flex flex-col">
 							<div className="relative flex justify-center overflow-hidden">
 								<PlayerSkin username={username} />
 								<div
@@ -73,10 +74,8 @@ function FeaturedPlayerSection({
 										onCardClick(username);
 									}}
 								/>
-							</div>
-
-							{!loading && !error && mainStats && (
-								<div className="flex justify-end gap-3">
+								{!loading && !error && mainStats && (
+									<div className="absolute bottom-0 right-0 flex justify-end gap-3">
 									<Badge
 										variant="outline"
 										role={mainStats.online ? "button" : undefined}
@@ -123,6 +122,7 @@ function FeaturedPlayerSection({
 									</Badge>
 								</div>
 							)}
+							</div>
 						</div>
 					</div>
 				</CardContent>
@@ -154,6 +154,7 @@ export default function MainPage() {
 	);
 
 	const router = useRouter();
+	const { setReady } = useAppReady();
 	const [onlineDialogOpen, setOnlineDialogOpen] = useState(false);
 	const [onlineDialogServer, setOnlineDialogServer] = useState<string | null>(
 		null,
@@ -222,6 +223,10 @@ export default function MainPage() {
 	}, [fetchAll]);
 
 	const anyLoading = FEATURED_USERNAMES.some((u) => data[u]?.loading === true);
+
+	useEffect(() => {
+		if (!anyLoading) setReady(true);
+	}, [anyLoading, setReady]);
 
 	return (
 		<div className="min-h-screen bg-background py-8 px-4">

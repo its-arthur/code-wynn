@@ -8,6 +8,7 @@ import {
 	GeistPixelTriangle,
 } from "geist/font/pixel";
 import { GeistSans } from "geist/font/sans";
+import { AppReadyProvider, RouteReadyGate } from "@/contexts/app-ready-context";
 import { DisableZoomHandler } from "@/components/disable-zoom-handler";
 import { Footer } from "@/components/footer";
 import { MountLoadingScreen } from "@/components/mount-loading-screen";
@@ -41,12 +42,15 @@ export default function RootLayout({
 				className="flex min-h-screen flex-col antialiased bg-background text-foreground font-sans select-none touch-manipulation"
 				suppressHydrationWarning
 			>
-				<DisableZoomHandler />
-				<MountLoadingScreen />
-				<Navbar />
-				<main className="flex-1">{children}</main>
-				<Footer />
-				<Toaster position="bottom-right" />
+				<AppReadyProvider>
+					<DisableZoomHandler />
+					<MountLoadingScreen />
+					<RouteReadyGate />
+					<Navbar />
+					<main className="flex-1">{children}</main>
+					<Footer />
+					<Toaster position="bottom-right" />
+				</AppReadyProvider>
 			</body>
 		</html>
 	);
