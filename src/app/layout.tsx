@@ -9,6 +9,7 @@ import {
 } from "geist/font/pixel";
 import { GeistSans } from "geist/font/sans";
 import { DisableZoomHandler } from "@/components/disable-zoom-handler";
+import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -36,12 +37,13 @@ export default function RootLayout({
 			className={`dark ${GeistSans.variable} ${GeistMono.variable} ${GeistPixelSquare.variable} ${GeistPixelGrid.variable} ${GeistPixelCircle.variable} ${GeistPixelTriangle.variable} ${GeistPixelLine.variable}`}
 		>
 			<body
-				className="antialiased bg-background text-foreground font-sans select-none touch-manipulation"
+				className="flex min-h-screen flex-col antialiased bg-background text-foreground font-sans select-none touch-manipulation"
 				suppressHydrationWarning
 			>
 				<DisableZoomHandler />
 				<Navbar />
-				{children}
+				<main className="flex-1">{children}</main>
+				<Footer />
 				<Toaster position="bottom-right" />
 			</body>
 		</html>
