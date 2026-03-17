@@ -40,7 +40,7 @@ function FeaturedPlayerSection({
 	onOnlineBadgeClick?: (server: string) => void;
 }) {
 	return (
-		<div className="hover:cursor-pointer relative group w-full mx-auto z-10">
+		<div className="hover:cursor-pointer relative group flex-1 w-72 max-w-72 mx-auto z-10">
 			<Card
 				className=" transition-colors w-full bg-muted/70 backdrop-blur-sm group-hover:bg-muted/50 group-hover:border-emerald-400/60"
 				role="button"
@@ -76,11 +76,11 @@ function FeaturedPlayerSection({
 								/>
 								{!loading && !error && mainStats && (
 									<div className="absolute bottom-0 right-0 flex justify-end gap-3">
-									<Badge
-										variant="outline"
-										role={mainStats.online ? "button" : undefined}
-										tabIndex={mainStats.online ? 0 : undefined}
-										className={`
+										<Badge
+											variant="outline"
+											role={mainStats.online ? "button" : undefined}
+											tabIndex={mainStats.online ? 0 : undefined}
+											className={`
                     ${
 											mainStats.online
 												? "cursor-pointer border-green-500/60 text-green-600 dark:text-green-400 hover:bg-green-500/10"
@@ -88,47 +88,51 @@ function FeaturedPlayerSection({
 										}
                       z-50 font-mono
                       `}
-										onClick={
-											mainStats.online && mainStats.server && onOnlineBadgeClick
-												? (e) => {
-														e.stopPropagation();
-														onOnlineBadgeClick(mainStats.server!);
-													}
-												: undefined
-										}
-										onKeyDown={
-											mainStats.online && mainStats.server && onOnlineBadgeClick
-												? (e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
+											onClick={
+												mainStats.online &&
+												mainStats.server &&
+												onOnlineBadgeClick
+													? (e) => {
 															e.stopPropagation();
 															onOnlineBadgeClick(mainStats.server!);
 														}
-													}
-												: undefined
-										}
-									>
-										<span
-											className={
-												mainStats.online
-													? "size-2 shrink-0 rounded-full bg-green-500"
-													: "size-2 shrink-0 rounded-full bg-red-500"
+													: undefined
 											}
-											aria-hidden
-										/>
-										{mainStats.online
-											? `Online · ${mainStats.server}`
-											: "Offline"}
-									</Badge>
-								</div>
-							)}
+											onKeyDown={
+												mainStats.online &&
+												mainStats.server &&
+												onOnlineBadgeClick
+													? (e) => {
+															if (e.key === "Enter" || e.key === " ") {
+																e.preventDefault();
+																e.stopPropagation();
+																onOnlineBadgeClick(mainStats.server!);
+															}
+														}
+													: undefined
+											}
+										>
+											<span
+												className={
+													mainStats.online
+														? "size-2 shrink-0 rounded-full bg-green-500"
+														: "size-2 shrink-0 rounded-full bg-red-500"
+												}
+												aria-hidden
+											/>
+											{mainStats.online
+												? `Online · ${mainStats.server}`
+												: "Offline"}
+										</Badge>
+									</div>
+								)}
 							</div>
 						</div>
 					</div>
 				</CardContent>
 			</Card>
 			<p
-				className="flex flex-col items-center text-center font-sans text-sm text-muted-foreground mt-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+				className="flex flex-col items-center text-center font-sans text-sm text-muted-foreground mt-2 w-full opacity-0 transition-opacity duration-200 group-hover:opacity-100"
 				aria-hidden
 			>
 				<span className="h-1.5 w-8 rounded-full bg-emerald-400/50" />
@@ -231,7 +235,10 @@ export default function MainPage() {
 	return (
 		<div className="min-h-screen bg-background py-4 sm:py-8 px-3 sm:px-4">
 			<main className="relative flex min-h-screen flex-col gap-4 items-center justify-center">
-				<div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full max-w-7xl mx-auto">
+				<p className=" text-4xl sm:text-6xl lg:text-8xl font-pixel-circle text-white capitalize px-2 text-center max-w-full truncate">
+					project-wynn
+				</p>
+				<div className="relative z-10 gap-4 flex flex-wrap w-full max-w-6xl mx-auto justify-center">
 					{FEATURED_USERNAMES.map((username) => (
 						<FeaturedPlayerSection
 							key={username}
@@ -253,9 +260,6 @@ export default function MainPage() {
 						/>
 					</div>
 				</div>
-				<p className="hidden sm:block sm:absolute top-20 sm:top-24 text-4xl sm:text-6xl lg:text-8xl font-pixel-circle text-white capitalize px-2 text-center max-w-full truncate">
-					project-wynn
-				</p>
 
 				<Button
 					variant="outline"
