@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getPlayerMainStats } from "@/api/player";
 import { Badge } from "@/components/ui/badge";
@@ -238,9 +239,11 @@ export default function MainPage() {
 						/>
 					))}
 					<div className="absolute inset-0 z-0 flex items-center justify-center">
-						<img
+						<Image
 							src="https://cdn.wynncraft.com/nextgen/wynncraft_icon.png"
 							alt="Wynncraft"
+							width={384}
+							height={384}
 							className="h-96 w-96 shrink-0 object-contain sm:h-96 sm:w-96"
 						/>
 					</div>

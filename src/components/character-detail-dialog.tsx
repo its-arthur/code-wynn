@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { AbilityMapGrid } from "@/components/ability-map-grid";
 import {
 	Dialog,
@@ -115,9 +116,11 @@ function CharacterFullCard({ char }: { char: PlayerCharacterData }) {
 					<Card key={name} className="min-w-0 h-fit ">
 						<CardContent className="gap-4 flex flex-col px-4 py-3">
 							<div className="w-full items-center gap-2 grid grid-cols-[30%_70%]">
-								<img
+								<Image
 									src={wynnLeaderboardIconUrl(name)}
 									alt={name}
+									width={40}
+									height={40}
 									className="h-10 w-10 shrink-0 object-contain"
 								/>
 								<div className="flex text-xs min-w-0 flex-col justify-center gap-0.5">
@@ -204,9 +207,11 @@ export function CharacterDetailDialog({
 								<SelectTrigger className="min-h-14 w-full max-w-sm items-start gap-3 py-2 pl-2.5 pr-3 text-left">
 									{selectedChar && !selectedUuid ? (
 										<>
-											<img
+											<Image
 												src={wynnClassIconUrl(selectedChar.type)}
 												alt=""
+												width={40}
+												height={40}
 												className="size-10 shrink-0 object-contain"
 											/>
 											<div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -248,9 +253,11 @@ export function CharacterDetailDialog({
 											value={uuid}
 											className="items-start gap-3 py-2"
 										>
-											<img
+											<Image
 												src={wynnClassIconUrl(char.type)}
 												alt=""
+												width={32}
+												height={32}
 												className="size-8 shrink-0 object-contain"
 											/>
 											<div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -327,10 +334,12 @@ export function CharacterDetailDialog({
 										)}
 									</div>
 									<div className="relative flex min-h-0 flex-1 p-4 overflow-hidden rounded-xl bg-muted/20 ring-1 ring-border/50 transition-all duration-200 group-hover:ring-primary/40">
-										<img
+										<Image
 											src={wynnClassPictureUrl(selectedChar.type)}
 											alt={selectedChar.type}
-											className="size-full object-contain object-center transition-transform duration-200 group-hover:scale-105"
+											fill
+											sizes="(max-width: 768px) 100vw, 400px"
+											className="object-contain object-center transition-transform duration-200 group-hover:scale-105"
 										/>
 									</div>
 								</div>
@@ -397,9 +406,11 @@ export function CharacterDetailDialog({
 													([name, count]) => (
 														<Card key={name} className="min-w-0">
 															<CardContent className="grid grid-cols-[30%_70%] gap-x-3 gap-y-1 px-4 py-3">
-																<img
+																<Image
 																	src={wynnDungeonIconUrl(name)}
 																	alt={name}
+																	width={48}
+																	height={48}
 																	className="h-full w-full shrink-0 object-contain"
 																/>
 																<div className="flex min-w-0 flex-col justify-center gap-0.5">
@@ -450,9 +461,11 @@ export function CharacterDetailDialog({
 													([name, count]) => (
 														<Card key={name} className="min-w-0">
 															<CardContent className="grid grid-cols-[30%_70%] gap-x-3 gap-y-1 px-4 py-3">
-																<img
+																<Image
 																	src={wynnRaidIconUrl(name)}
 																	alt={name}
+																	width={48}
+																	height={48}
 																	className="h-full w-full shrink-0 object-contain"
 																/>
 																<div className="flex min-w-0 flex-col justify-center gap-0.5">
@@ -493,9 +506,11 @@ export function CharacterDetailDialog({
 									{SKILL_ENTRIES.map((e) => (
 										<Card key={e.key} className={`min-w-20 flex-1 shrink-0`}>
 											<CardContent className="flex flex-col items-center gap-2 p-4">
-												<img
+												<Image
 													src={wynnSkillIconUrl(e.iconName)}
 													alt={e.label}
+													width={56}
+													height={56}
 													className="h-14 w-14 shrink-0 object-contain"
 												/>
 												<span

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { getOnlinePlayerList } from "@/api/online";
 import { CopySwitchButton } from "@/components/copy-switch-button";
@@ -171,9 +172,11 @@ export function OnlinePlayersDialog({
 										className={className}
 										title={name}
 									>
-										<img
+										<Image
 											src={`https://mc-heads.net/avatar/${encodeURIComponent(name)}`}
 											alt=""
+											width={32}
+											height={32}
 											className="size-8 shrink-0 rounded-md ring-1 ring-border/50"
 										/>
 										<span className="min-w-0 truncate font-mono">{name}</span>

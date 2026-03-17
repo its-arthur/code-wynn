@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { ArticleDetail, ArticleContentBlock } from "@/types/article";
 import { wynnNextgenPath } from "@/lib/wynn-cdn";
 import { Badge } from "@/components/ui/badge";
@@ -102,11 +103,13 @@ function ImageBlock({ block }: { block: ArticleContentBlock }) {
   return (
     <div className="mt-5 flex flex-col items-center gap-4">
       {images.map((src, i) => (
-        <div key={i} className="w-full overflow-hidden rounded-lg bg-transparent">
-          <img
+        <div key={i} className="relative w-full aspect-video overflow-hidden rounded-lg bg-transparent">
+          <Image
             src={wynnNextgenPath(src)}
             alt=""
-            className="w-full object-contain transition-transform duration-300 hover:scale-105"
+            fill
+            sizes="(max-width: 768px) 100vw, 672px"
+            className="object-contain transition-transform duration-300 hover:scale-105"
           />
         </div>
       ))}
@@ -130,11 +133,13 @@ export function ArticleDetailView({ article }: { article: ArticleDetail }) {
     <article className="w-full max-w-2xl mx-auto">
       {/* Banner */}
       {article.banner && (
-        <div className="overflow-hidden rounded-lg">
-          <img
+        <div className={`relative overflow-hidden rounded-lg ${article.banner_zoom ? "aspect-21/9 scale-105" : "aspect-video"}`}>
+          <Image
             src={wynnNextgenPath(article.banner)}
             alt={article.title}
-            className={`w-full object-cover ${article.banner_zoom ? "aspect-21/9 scale-105" : "aspect-video"}`}
+            fill
+            sizes="(max-width: 768px) 100vw, 672px"
+            className="object-cover"
           />
         </div>
       )}

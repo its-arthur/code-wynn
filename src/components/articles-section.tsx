@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
 	getArticlesList,
 	articlesResultsToArray,
@@ -136,13 +137,13 @@ export function ArticlesSection() {
 								onClick={() => openArticle(item.pk)}
 							>
 								{item.banner && (
-									<>
-										<img
-											src={wynnNextgenPath(item.banner)}
-											alt={item.title}
-											className="relative z-20 aspect-video w-full object-cover"
-										/>
-									</>
+									<Image
+										src={wynnNextgenPath(item.banner)}
+										alt={item.title}
+										width={1600}
+										height={900}
+										className="relative z-20 aspect-video w-full object-cover"
+									/>
 								)}
 								<CardHeader>
 									<CardAction>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 const E_PER_EB = 64;
@@ -55,7 +56,7 @@ export function EmeraldPrice({
 	if (parts.length === 0) {
 		return (
 			<span className={cn("inline-flex items-center gap-0.5", textSize, className)}>
-				<img src="/currentcy/em.webp" alt="e" className={cn(iconSize, "inline-block")} />
+				<Image src="/currentcy/em.webp" alt="e" width={40} height={40} className={cn(iconSize, "inline-block")} />
 				<span className="tabular-nums font-medium">0</span>
 			</span>
 		);
@@ -65,7 +66,7 @@ export function EmeraldPrice({
 		<span className={cn("inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5", textSize, className)}>
 			{parts.map(({ key, icon, label }) => (
 				<span key={key} className="inline-flex items-center gap-0.5">
-					<img src={icon} alt={label} className={cn(iconSize, "inline-block")} />
+					<Image src={icon} alt={label} width={40} height={40} className={cn(iconSize, "inline-block")} />
 					<span className="tabular-nums font-medium">{bd[key]}</span>
 				</span>
 			))}

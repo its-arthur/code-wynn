@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -49,9 +50,11 @@ function AspectTiersDisplay({ aspect }: { aspect: AspectEntry }) {
             <div className="flex items-start gap-4">
                 <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40">
                     {iconUrl && (
-                        <img
+                        <Image
                             src={iconUrl}
                             alt=""
+                            width={40}
+                            height={40}
                             className="size-10 shrink-0 object-contain"
                         />
                     )}

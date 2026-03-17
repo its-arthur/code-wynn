@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -120,10 +121,12 @@ export function RaidsContent({
 					<p className="text-2xl capitalize text-white font-pixel-circle">
 							{selectedRegion ?? grouped[0].region}
 						</p>
-						<img
+						<Image
 							src={`https://cdn.wynncraft.com/nextgen/raids/${encodeURIComponent(selectedRegion ?? grouped[0].region)}.webp`}
 							alt={selectedRegion ?? grouped[0].region}
-							className="size-72 rounded-lg object-cover "
+							width={288}
+							height={288}
+							className="size-72 rounded-lg object-cover"
 						/>
 						<Separator className="my-6 max-w-4xl mx-auto" />
 						

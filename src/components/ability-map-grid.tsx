@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import {
 	getAbilityNodeIconUrl,
 	getConnectorIconUrl,
@@ -185,23 +186,25 @@ export function AbilityMapGrid({
 								{defaultIconUrl || activeIconUrl ? (
 									<>
 										{defaultIconUrl && (
-											<img
+											<Image
 												src={defaultIconUrl}
 												alt=""
-												className="block shrink-0 object-contain "
+												width={iconSizePx}
+												height={iconSizePx}
+												className="block shrink-0 object-contain"
 												style={{
-													...iconSizeStyle,
 													imageRendering: "pixelated",
 												}}
 											/>
 										)}
 										{activeIconUrl && (
-											<img
+											<Image
 												src={activeIconUrl}
 												alt=""
+												width={iconSizePx}
+												height={iconSizePx}
 												className="absolute inset-0 m-auto block shrink-0 object-contain transition-opacity duration-200"
 												style={{
-													...iconSizeStyle,
 													opacity: showActiveIcon ? 1 : 0,
 													imageRendering: "pixelated",
 												}}
@@ -330,16 +333,20 @@ export function AbilityMapGrid({
 								className="relative flex items-center justify-center p-0 m-0 min-w-0 min-h-0"
 								style={{ gridColumn: col, gridRow: row }}
 							>
-								<img
+								<Image
 									src={defaultUrl}
 									alt=""
+									width={55}
+									height={55}
 									className="block h-full max-h-[55px] w-full max-w-[55px] shrink-0 object-contain"
 									style={{ imageRendering: "pixelated" }}
 								/>
 								{isActive && (
-									<img
+									<Image
 										src={activeUrl}
 										alt=""
+										width={55}
+										height={55}
 										className="block absolute inset-0 m-auto h-full max-h-[55px] w-full max-w-[55px] shrink-0 object-contain z-10"
 										style={{ imageRendering: "pixelated" }}
 									/>

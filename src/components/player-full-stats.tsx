@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { getAbilityTree, getAbilityMap } from "@/api/ability";
 import { getPlayerCharacterAbilityMap } from "@/api/player";
 import { CharacterDetailDialog } from "@/components/character-detail-dialog";
@@ -69,9 +70,11 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
 				<CardContent className="flex flex-col gap-4">
 					<p className="flex flex-wrap items-center justify-center gap-2">
 						{mainStats?.rankBadge && (
-							<img
+							<Image
 								src={rankBadgeUrl(mainStats.rankBadge)}
 								alt={mainStats.rank}
+								width={80}
+								height={24}
 								className="h-6 w-auto inline-block align-middle"
 							/>
 						)}
@@ -301,9 +304,11 @@ export function MainStatsCards({ mainStats }: { mainStats: PlayerMainStats }) {
                 .sort(([, a], [, b]) => a - b)
                 .map(([name, pos]) => (
                   <li key={name}>
-                    <img
+                    <Image
                       src={wynnLeaderboardIconUrl(name.replace(/([A-Z])/g, " $1").split(" ")[0])}
                       alt={name.replace(/([A-Z])/g, " $1").split(" ")[0]}
+                      width={48}
+                      height={20}
                       className="h-5 w-auto inline-block align-middle capitalize"
                     />
                     <span className="text-muted-foreground capitalize">
@@ -355,10 +360,12 @@ function CharacterCard({
 		>
 			<div className="p-4 pb-0">
 				<div className="relative mx-auto aspect-square w-full max-w-[200px] p-4 overflow-hidden rounded-xl bg-muted/20 ring-1 ring-border/50 transition-all duration-200 group-hover:ring-primary/40">
-					<img
+					<Image
 						src={wynnClassIconUrl(char.type)}
 						alt={char.type}
-						className="size-full object-contain object-center transition-transform duration-200 group-hover:scale-105"
+						fill
+						sizes="200px"
+						className="object-contain object-center transition-transform duration-200 group-hover:scale-105"
 					/>
 				</div>
 			</div>

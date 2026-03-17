@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ItemEntry } from "@/types/item";
 import {
 	wynnItemGuideUrl,
@@ -294,20 +295,22 @@ function ItemIcon({
 	const imgClass = cn("shrink-0 object-contain", className ?? "size-8");
 	if (imgError) {
 		return (
-			<img
+			<Image
 				src="/wynn.webp"
 				alt={alt ?? ""}
+				width={64}
+				height={64}
 				className={imgClass}
-				loading="lazy"
 			/>
 		);
 	}
 	return (
-		<img
+		<Image
 			src={url || "/wynn.webp"}
 			alt={alt ?? ""}
+			width={64}
+			height={64}
 			className={imgClass}
-			loading="lazy"
 			onError={() => setImgError(true)}
 		/>
 	);
