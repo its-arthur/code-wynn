@@ -54,10 +54,7 @@ export function MountLoadingScreen() {
 				<div>
 				<p className="text-xs font-bold font-mono text-white capitalize">
 					project-wynn
-				</p>
-				<p className="text-xs font-mono text-white capitalize">
-					Loading...
-				</p>
+					</p>
 				</div>
 				
 			</div>
