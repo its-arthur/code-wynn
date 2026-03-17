@@ -11,6 +11,7 @@ import { getRaidRewardsGrouped } from "@/api/wynnventory/raidpool";
 import type { ItemDatabase } from "@/types/item";
 import type { RaidGroupedRegion } from "@/types/wynnventory/raidpool";
 import { Separator } from "@/components/ui/separator";
+import { ItemInfo } from "@/components/item-info";
 
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const STALE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // check every hour
@@ -43,6 +44,8 @@ export function RaidsContent({
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+	const [itemInfoOpen, setItemInfoOpen] = useState(false);
+	const [itemInfoName, setItemInfoName] = useState("");
 
 	useEffect(() => {
 		getItemDatabaseFull().then(setItemDb).catch(() => {});
@@ -89,10 +92,18 @@ export function RaidsContent({
 		return () => clearInterval(id);
 	}, [grouped, fetchGrouped]);
 
+	const openItemInfo = useCallback((name: string) => {
+		setItemInfoName(name);
+		setItemInfoOpen(true);
+	}, []);
+
 	return (
 		<div className="space-y-4">
-
-			
+			<ItemInfo
+				open={itemInfoOpen}
+				onOpenChange={setItemInfoOpen}
+				name={itemInfoName}
+			/>
 			{error && <ErrorBanner message={error} />}
 
 			{loading ? (
@@ -136,6 +147,7 @@ export function RaidsContent({
 								timestamp={r.timestamp}
 								groups={r.group_items}
 								itemDb={itemDb}
+								onItemClick={openItemInfo}
 							/>
 						</TabsContent>
 					))}

@@ -25,7 +25,13 @@ const RARITY_BADGE: Record<string, string> = {
 	mythic: "bg-purple-900/40 text-purple-300 border-purple-700/60",
 };
 
-export function RaidItem({ completedData }: { completedData: CompletedData }) {
+export function RaidItem({
+	completedData,
+	onClick,
+}: {
+	completedData: CompletedData;
+	onClick?: () => void;
+}) {
 	const { wynn, wynnInv } = completedData;
 	const item = wynnInv;
 	const rarity = item.rarity.toLowerCase();
@@ -37,7 +43,22 @@ export function RaidItem({ completedData }: { completedData: CompletedData }) {
 	const iconItem = wynn ?? item.icon?.value ?? item.name;
 
 	return (
-		<div className="flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/60">
+		<div
+			role={onClick ? "button" : undefined}
+			tabIndex={onClick ? 0 : undefined}
+			onClick={onClick}
+			onKeyDown={
+				onClick
+					? (e) =>
+							(e.key === "Enter" || e.key === " ") &&
+							(e.preventDefault(), onClick())
+					: undefined
+			}
+			className={cn(
+				"flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/60",
+				onClick && "cursor-pointer",
+			)}
+		>
 			<span
 				className={cn(
 					"flex shrink-0 overflow-hidden rounded border-2",

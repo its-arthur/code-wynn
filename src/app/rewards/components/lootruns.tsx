@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Info, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +25,7 @@ import type { LootrunGroupedRegion } from "@/types/wynnventory/lootpool";
 import type { CompletedData } from "@/components/raidpool/region-card";
 import type { GroupedLootItem } from "@/types/wynnventory/common";
 import { Separator } from "@/components/ui/separator";
+import { ItemInfo } from "@/components/item-info";
 
 const AUTO_SCROLL_DELAY_MS = 4000;
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -60,6 +61,8 @@ export function LootrunsContent({
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+	const [itemInfoOpen, setItemInfoOpen] = useState(false);
+	const [itemInfoName, setItemInfoName] = useState("");
 
 	useEffect(() => {
 		getItemDatabaseFull().then(setItemDb).catch(() => {});
@@ -106,8 +109,18 @@ export function LootrunsContent({
 		return () => clearInterval(id);
 	}, [grouped, fetchGrouped]);
 
+	const openItemInfo = useCallback((name: string) => {
+		setItemInfoName(name);
+		setItemInfoOpen(true);
+	}, []);
+
 	return (
 		<div className="space-y-4">
+			<ItemInfo
+				open={itemInfoOpen}
+				onOpenChange={setItemInfoOpen}
+				name={itemInfoName}
+			/>
 			{error && <ErrorBanner message={error} />}
 
 			{loading ? (
@@ -119,6 +132,7 @@ export function LootrunsContent({
 						itemDb={itemDb}
 						selectedRegion={selectedRegion ?? grouped[0].region}
 						onRegionSelect={setSelectedRegion}
+							onItemInfoClick={openItemInfo}
 					/>
 					<Separator className="my-6 max-w-4xl mx-auto" />
 					<Tabs
@@ -147,6 +161,7 @@ export function LootrunsContent({
 									timestamp={r.timestamp}
 									groups={r.region_items}
 									itemDb={itemDb}
+									onItemClick={openItemInfo}
 								/>
 							</TabsContent>
 						))}
@@ -166,11 +181,13 @@ function ShinyCarousel({
 	itemDb,
 	selectedRegion,
 	onRegionSelect,
+	onItemInfoClick,
 }: {
 	grouped: LootrunGroupedRegion[];
 	itemDb: ItemDatabase;
 	selectedRegion: string;
 	onRegionSelect: (region: string) => void;
+		onItemInfoClick?: (name: string) => void;
 }) {
 	const [api, setApi] = useState<CarouselApi | null>(null);
 	const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -247,6 +264,7 @@ function ShinyCarousel({
 								toCompletedData={toCompletedData}
 								isActive={regionLabel === selectedRegion}
 								onClick={() => onRegionSelect(regionLabel)}
+								onItemInfoClick={onItemInfoClick}
 							/>
 						</CarouselItem>
 					))}
@@ -262,12 +280,14 @@ function ShinyItemCard({
 	toCompletedData,
 	isActive,
 	onClick,
+	onItemInfoClick,
 }: {
 	item: GroupedLootItem;
 	regionLabel: string;
 	toCompletedData: (item: GroupedLootItem) => CompletedData;
 	isActive: boolean;
 	onClick: () => void;
+		onItemInfoClick?: (name: string) => void;
 }) {
 	const { wynn } = toCompletedData(item);
 	const iconItem = wynn ?? item.icon?.value ?? item.name;
@@ -294,6 +314,19 @@ function ShinyItemCard({
 			)}
 		>
 			<CardContent className="flex flex-col items-center gap-3 p-4 relative">
+				{onItemInfoClick && (
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							onItemInfoClick(item.name);
+						}}
+						className="absolute top-2 right-2 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+						aria-label="View item info"
+					>
+						<Info className="size-4" />
+					</button>
+				)}
 				<span
 					className={cn(
 						"flex shrink-0 overflow-hidden rounded-lg border-2",

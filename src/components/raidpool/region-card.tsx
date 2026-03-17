@@ -17,6 +17,7 @@ interface RegionCardProps {
 	items?: WynnventoryItem[];
 	groups?: LootItemGroup[];
 	itemDb?: Record<string, ItemEntry>;
+	onItemClick?: (name: string) => void;
 }
 
 const RARITY_ORDER = [
@@ -55,6 +56,7 @@ export function RegionCard({
 	items,
 	groups,
 	itemDb,
+	onItemClick,
 }: RegionCardProps) {
 	const toCompletedData = (
 		item: WynnventoryItem,
@@ -101,6 +103,7 @@ export function RegionCard({
 							<RaidItem
 								key={`${item.name}-${i}`}
 								completedData={toCompletedData(item)}
+								onClick={onItemClick ? () => onItemClick(item.name) : undefined}
 							/>
 						))}
 					</div>
@@ -118,6 +121,7 @@ export function RegionCard({
 										<RaidItem
 											key={`${item.name}-${i}`}
 											completedData={toCompletedDataFromGrouped(item)}
+											onClick={onItemClick ? () => onItemClick(item.name) : undefined}
 										/>
 									))}
 								</div>
