@@ -161,7 +161,7 @@ export function ItemSearchInput({
 	}
 
 	return (
-		<div ref={containerRef} className={cn("relative", className)}>
+		<div ref={containerRef} className={cn("relative min-w-0", className)}>
 			{loading ? (
 				<Loader2 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none z-10 animate-spin" />
 			) : (
@@ -195,7 +195,7 @@ export function ItemSearchInput({
 			)}
 
 			{open && (loading || results.length > 0) && (
-				<ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+				<ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[min(16rem,50vh)] overflow-y-auto rounded-md border border-border bg-popover shadow-md">
 					{loading && results.length === 0 ? (
 						<li className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
 							<Loader2 className="size-4 animate-spin shrink-0" />

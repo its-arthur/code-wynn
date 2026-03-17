@@ -28,13 +28,13 @@ export default function RewardsPage() {
 			onValueChange={(v) => setMode(v as "lootruns" | "raids")}
 			className="space-y-4"
 		>
-			<div className="relative flex items-center justify-center ">
-			<TabsList className="flex-wrap font-mono capitalize">
+			<div className="relative flex flex-row items-center justify-between sm:justify-center w-full gap-2">
+			<TabsList className="flex-wrap font-mono capitalize w-fit shrink-0">
 					<TabsTrigger value="lootruns">Lootruns</TabsTrigger>
 					<TabsTrigger value="raids">Raids</TabsTrigger>
 				</TabsList>
 				<Button
-					className="absolute right-0"
+					className="shrink-0 sm:absolute sm:right-0"
 					variant="outline"
 					size="sm"
 					onClick={handleRefresh}

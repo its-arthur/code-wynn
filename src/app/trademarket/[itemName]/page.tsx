@@ -494,8 +494,8 @@ export default function TradeItemDetailPage({
 		dateRange === "7d" ? formatDateTimeFull : formatDateFull;
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center justify-between gap-3">
+		<div className="space-y-6 px-1 sm:px-0">
+			<div className="flex sm:flex-row items-stretch sm:items-center justify-between gap-3">
 				<Button variant="ghost" size="sm" asChild>
 					<Link href="/trademarket">
 						<ArrowLeft className="size-4" />
@@ -512,8 +512,8 @@ export default function TradeItemDetailPage({
 				</Button>
 			</div>
 
-			<div className="flex items-center gap-4">
-				<div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40">
+			<div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 min-w-0">
+				<div className="flex size-14 sm:size-16 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40">
 					<ItemIcon
 						item={itemEntry ?? decodedName}
 						alt={decodedName}
@@ -547,13 +547,13 @@ export default function TradeItemDetailPage({
 			{errorPrice && <ErrorBanner message={errorPrice} />}
 
 			{loadingPrice ? (
-				<div className="grid grid-cols-3 gap-3">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 					{Array.from({ length: 3 }).map((_, i) => (
 						<Skeleton key={i} className="h-[88px] rounded-lg" />
 					))}
 				</div>
 			) : priceInfo ? (
-				<div className="grid grid-cols-3 gap-3">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 					<StatCard
 						label="Avg"
 						price={priceInfo.average_price}
@@ -573,10 +573,10 @@ export default function TradeItemDetailPage({
 
 			{/* Price history chart */}
 			<Card>
-				<CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
+				<CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
 					<CardTitle className="text-sm font-medium">Price History</CardTitle>
 					{/* Series toggles */}
-					<div className="flex flex-wrap gap-1.5">
+					<div className="flex flex-wrap gap-1.5 min-w-0">
 						{ALL_SERIES.map((key) => {
 							const cfg = chartConfig[key];
 							const active = visibleSeries.has(key);
@@ -608,11 +608,11 @@ export default function TradeItemDetailPage({
 					{errorHistory && <ErrorBanner message={errorHistory} />}
 
 					{loadingHistory ? (
-						<Skeleton className="h-[320px] rounded-lg" />
+						<Skeleton className="h-[280px] sm:h-[320px] min-h-[200px] rounded-lg" />
 					) : history.length > 0 ? (
 						<ChartContainer
 							config={chartConfig}
-							className="aspect-auto h-[320px] w-full"
+								className="aspect-auto h-[280px] sm:h-[320px] min-h-[200px] w-full"
 						>
 							<ComposedChart
 								data={history}
@@ -782,7 +782,7 @@ export default function TradeItemDetailPage({
 								type="button"
 								onClick={() => setDateRange(range)}
 								className={cn(
-									"rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+									"rounded-full border px-3 py-2 text-xs font-medium transition-colors min-h-9",
 									dateRange === range
 										? "border-primary bg-primary/20 text-primary"
 										: "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground",
@@ -802,12 +802,12 @@ export default function TradeItemDetailPage({
 			{/* Recent listings */}
 			<Card>
 				<CardHeader className="pb-2">
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-						<div className="flex items-center gap-2">
-							<CardTitle className="text-sm font-medium">
+					<div className="flex gap-2 sm:flex-row sm:items-center justify-between">
+						<div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
+							<CardTitle className="text-sm font-medium shrink-0">
 								Recent Listings
 							</CardTitle>
-							<div className="flex rounded-lg border border-border/50 w-fit p-0.5">
+							<div className="flex rounded-lg border border-border/50 w-fit p-0.5 ">
 								<button
 									type="button"
 									onClick={() => setListingsTab("identified")}
@@ -818,7 +818,7 @@ export default function TradeItemDetailPage({
 											: "text-muted-foreground hover:text-foreground",
 									)}
 								>
-									Identified
+									Id
 								</button>
 								<button
 									type="button"
@@ -830,11 +830,11 @@ export default function TradeItemDetailPage({
 											: "text-muted-foreground hover:text-foreground",
 									)}
 								>
-									Unidentified
+									Unid
 								</button>
 							</div>
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex  flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
 							{listingsMaxPage > 1 && !loadingListings && (
 								<div className="flex items-center gap-0.5">
 									<Button
@@ -884,11 +884,11 @@ export default function TradeItemDetailPage({
 					{errorListings && <ErrorBanner message={errorListings} />}
 
 					{loadingListings ? (
-						<Table className="[&_tbody_td]:py-4">
+						<Table className="[&_tbody_td]:py-3 sm:[&_tbody_td]:py-4">
 							<TableHeader>
 								<TableRow>
 									<TableHead>Item</TableHead>
-									<TableHead className="text-right">Roll</TableHead>
+									<TableHead className="text-center">Roll</TableHead>
 									<TableHead className="text-right">Price</TableHead>
 									<TableHead className="text-right">Time</TableHead>
 								</TableRow>
@@ -913,11 +913,11 @@ export default function TradeItemDetailPage({
 							</TableBody>
 						</Table>
 					) : listings.length > 0 ? (
-						<Table className="[&_tbody_td]:py-4">
+							<Table className="[&_tbody_td]:py-3 sm:[&_tbody_td]:py-4">
 							<TableHeader>
 								<TableRow>
 									<TableHead>Item</TableHead>
-									<TableHead className="text-right">Roll</TableHead>
+										<TableHead className="text-center">Roll</TableHead>
 									<TableHead className="text-right">Price</TableHead>
 									<TableHead className="text-right">Time</TableHead>
 								</TableRow>
@@ -1019,11 +1019,11 @@ export default function TradeItemDetailPage({
 													</div>
 												</div>
 											</TableCell>
-											<TableCell className="text-right font-mono tabular-nums">
+											<TableCell className="text-center font-mono tabular-nums">
 												{!l.unidentified &&
 												l.overall_roll != null &&
 												l.overall_roll > 0 ? (
-													<span className="text-muted-foreground">
+														<span className="text-muted-foreground flex flex-col">
 														{l.overall_roll.toFixed(1)}%
 														{l.reroll_count != null && l.reroll_count > 0 && (
 															<span className="text-xs">
@@ -1057,14 +1057,14 @@ export default function TradeItemDetailPage({
 					)}
 
 					{!loadingListings && listings.length > 0 && (
-						<div className="flex items-center pt-2 w-full">
+						<div className="flex flex-col sm:flex-row items-stretch sm:items-center pt-2 w-full gap-3">
 							<div className="flex-1 shrink-0 min-w-0 items-center gap-2 font-sans flex">
 								<p className="text-sm text-muted-foreground">Limit:</p>
 								<Select
 									value={String(listingsPageSize)}
 									onValueChange={(v) => setListingsPageSize(Number(v))}
 								>
-									<SelectTrigger size="sm" className="h-8 w-[80px]">
+									<SelectTrigger size="sm" className="h-9 sm:h-8 w-[80px] min-w-[80px]">
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
@@ -1074,12 +1074,13 @@ export default function TradeItemDetailPage({
 									</SelectContent>
 								</Select>
 							</div>
-							<div className="flex-1 flex items-center justify-center gap-2">
+							<div className="flex-1 flex flex-wrap items-center justify-center gap-2">
 								{listingsMaxPage > 1 && (
 									<>
 										<Button
 											variant="outline"
 											size="sm"
+											className="h-9 w-9 sm:h-8 sm:w-8 p-0 shrink-0"
 											onClick={() => setListingsPage((p) => Math.max(1, p - 1))}
 											disabled={listingsPage <= 1}
 										>
@@ -1091,7 +1092,7 @@ export default function TradeItemDetailPage({
 												p === "ellipsis" ? (
 													<span
 														key={`e-${i}`}
-														className="flex size-8 items-center justify-center text-xs text-muted-foreground"
+														className="flex size-8 items-center justify-center text-xs text-muted-foreground shrink-0"
 													>
 														…
 													</span>
@@ -1100,7 +1101,7 @@ export default function TradeItemDetailPage({
 														key={p}
 														variant={p === listingsPage ? "secondary" : "ghost"}
 														size="sm"
-														className="text-xs"
+															className="text-xs min-h-9 min-w-9 sm:min-h-8 sm:min-w-8 shrink-0"
 														onClick={() => setListingsPage(p)}
 													>
 														{p}
@@ -1111,6 +1112,7 @@ export default function TradeItemDetailPage({
 										<Button
 											variant="outline"
 											size="sm"
+											className="h-9 w-9 sm:h-8 sm:w-8 p-0 shrink-0"
 											onClick={() =>
 												setListingsPage((p) => Math.min(listingsMaxPage, p + 1))
 											}
@@ -1121,7 +1123,7 @@ export default function TradeItemDetailPage({
 									</>
 								)}
 							</div>
-							<div className="flex-1 shrink-0 min-w-0" aria-hidden />
+							<div className="flex-1 shrink-0 min-w-0 hidden sm:block" aria-hidden />
 						</div>
 					)}
 				</CardContent>

@@ -142,11 +142,11 @@ export function LootrunsContent({
 						onValueChange={setSelectedRegion}
 						className="space-y-4"
 					>
-						<div className="relative flex items-center justify-center gap-2">
-							<TabsList variant="line" className="flex-wrap">
+						<div className="relative flex items-center justify-start sm:justify-center gap-2 w-full overflow-x-auto sm:overflow-visible">
+							<TabsList variant="line" className="flex-nowrap sm:flex-wrap w-max min-w-full sm:min-w-0 sm:w-full justify-start sm:justify-center shrink-0">
 								{grouped.map((r) => (
 									<TabsTrigger
-										className="text-lg font-mono capitalize"
+										className="text-base sm:text-lg font-mono capitalize min-h-9 shrink-0"
 										key={r.region}
 										value={r.region}
 									>
@@ -246,19 +246,19 @@ function ShinyCarousel({
 
 	return (
 		<section className="space-y-4">
-			<h3 className="text-center font-medium text-white capitalize font-pixel-circle text-2xl">
+			<h3 className="text-center font-medium text-white capitalize font-pixel-circle text-base sm:text-lg">
 				Current active shiny
 			</h3>
 			<Carousel
 				opts={{ align: "start", loop: true }}
 				setApi={setApi}
-				className="w-full"
+				className="w-full min-w-0"
 			>
 				<CarouselContent className="-ml-4">
 					{shinyWithRegion.map(({ item, regionLabel }, i) => (
 						<CarouselItem
 							key={`${regionLabel}-${item.name}-${i}`}
-							className="pl-4 basis-1/2 sm:basis-1/4"
+							className="pl-4 basis-full sm:basis-1/2 lg:basis-1/4 min-w-0"
 						>
 							<ShinyItemCard
 								item={item}
@@ -310,7 +310,7 @@ function ShinyItemCard({
 				(e.preventDefault(), onClick())
 			}
 			className={cn(
-				"overflow-hidden transition-colors cursor-pointer hover:bg-muted/50",
+				"overflow-hidden transition-colors cursor-pointer hover:bg-muted/50 min-w-0",
 				isActive &&
 					"border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30 hover:bg-emerald-500/10",
 			)}
@@ -347,10 +347,10 @@ function ShinyItemCard({
 				>
 					{rarity}
 				</Badge>
-				<div className="flex flex-col items-center gap-1 text-center">
+				<div className="flex flex-col items-center gap-1 text-center min-w-0 w-full">
 					<span
 						className={cn(
-							"text-lg font-medium flex items-center gap-2",
+							"text-base sm:text-lg font-medium flex items-center gap-2 truncate max-w-full",
 							nameColor,
 						)}
 					>
@@ -396,7 +396,7 @@ function LootrunsLoadingSkeleton() {
 				<Skeleton className="h-8 w-56 mx-auto rounded" />
 				<div className="flex gap-4 -ml-4 overflow-hidden">
 					{Array.from({ length: 4 }).map((_, i) => (
-						<div key={i} className="pl-4 basis-1/2 sm:basis-1/4 shrink-0">
+						<div key={i} className="pl-4 basis-full sm:basis-1/2 lg:basis-1/4 shrink-0 min-w-0">
 							<Skeleton className="h-48 rounded-lg" />
 						</div>
 					))}

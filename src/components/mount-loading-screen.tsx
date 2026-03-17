@@ -47,8 +47,8 @@ export function MountLoadingScreen() {
 			style={{ transitionDuration: `${FADE_DURATION_MS}ms` }}
 			aria-hidden="true"
 		>
-			<div className="flex flex-col items-center gap-4">
-				<p className="text-8xl font-pixel-circle text-white capitalize">
+			<div className="flex flex-col items-center gap-4 px-4">
+				<p className="text-4xl sm:text-6xl lg:text-8xl font-pixel-circle text-white capitalize">
 					X
 				</p>
 				<div>

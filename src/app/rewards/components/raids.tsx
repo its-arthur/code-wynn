@@ -117,8 +117,8 @@ export function RaidsContent({
 					onValueChange={setSelectedRegion}
 					className="space-y-4"
 				>
-					<div className="relative flex flex-col items-center justify-center gap-2">
-					<p className="text-2xl capitalize text-white font-pixel-circle">
+					<div className="relative flex flex-col items-center justify-center gap-2 px-2">
+					<p className="text-lg sm:text-2xl capitalize text-white font-pixel-circle text-center wrap-break-word max-w-full">
 							{selectedRegion ?? grouped[0].region}
 						</p>
 						<Image
@@ -126,11 +126,11 @@ export function RaidsContent({
 							alt={selectedRegion ?? grouped[0].region}
 							width={288}
 							height={288}
-							className="size-72 rounded-lg object-cover"
+							className="size-48 sm:size-56 md:size-64 lg:size-72 rounded-lg object-cover"
 						/>
-						<Separator className="my-6 max-w-4xl mx-auto" />
+						<Separator className="my-6 max-w-4xl mx-auto w-full" />
 						
-						<TabsList variant="line" className="flex-wrap">
+						<TabsList variant="line" className="flex-nowrap sm:flex-wrap overflow-x-auto justify-center w-full max-w-full">
 							{grouped.map((r) => (
 								<TabsTrigger
 									className="text-lg font-mono"
@@ -179,7 +179,7 @@ function RaidsLoadingSkeleton() {
 		<div className="space-y-4">
 			<div className="flex flex-col items-center justify-center gap-2">
 				<Skeleton className="h-8 w-48 rounded" />
-				<Skeleton className="size-56 rounded-lg" />
+				<Skeleton className="size-48 sm:size-56 md:size-64 lg:size-72 rounded-lg" />
 			</div>
 			<div className="my-6 max-w-4xl mx-auto">
 				<Skeleton className="h-px w-full" />

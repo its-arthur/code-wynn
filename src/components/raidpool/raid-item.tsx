@@ -55,7 +55,7 @@ export function RaidItem({
 					: undefined
 			}
 			className={cn(
-				"flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/60",
+				"flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/60 min-w-0",
 				onClick && "cursor-pointer",
 			)}
 		>
@@ -70,12 +70,12 @@ export function RaidItem({
 			{item.shiny && <Sparkles className="size-3.5 shrink-0 text-yellow-400" />}
 
 			{item.amount > 1 && (
-				<span className="text-xs font-medium text-muted-foreground tabular-nums">
+				<span className="text-xs font-medium text-muted-foreground tabular-nums shrink-0">
 					{item.amount}x
 				</span>
 			)}
 
-			<span className={cn("text-sm font-medium truncate", nameColor)}>
+			<span className={cn("text-sm font-medium truncate min-w-0", nameColor)}>
 				{item.name}
 			</span>
 

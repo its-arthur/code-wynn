@@ -39,7 +39,7 @@ export default function RootLayout({
 			className={`dark ${GeistSans.variable} ${GeistMono.variable} ${GeistPixelSquare.variable} ${GeistPixelGrid.variable} ${GeistPixelCircle.variable} ${GeistPixelTriangle.variable} ${GeistPixelLine.variable}`}
 		>
 			<body
-				className="flex min-h-screen flex-col antialiased bg-background text-foreground font-sans select-none touch-manipulation"
+				className="flex min-h-screen flex-col antialiased bg-background text-foreground font-sans select-none touch-manipulation overflow-x-hidden"
 				suppressHydrationWarning
 			>
 				<AppReadyProvider>

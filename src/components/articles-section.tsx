@@ -76,8 +76,8 @@ export function ArticlesSection() {
 	}, [articleType, articlePage]);
 
 	return (
-		<section className=" w-full max-w-7xl">
-			<h2 className="mb-6 text-center text-6xl lg:text-9xl font-pixel-circle">
+		<section className="w-full max-w-7xl px-2 sm:px-0">
+			<h2 className="mb-6 text-center text-3xl sm:text-5xl lg:text-7xl xl:text-9xl font-pixel-circle">
 				Articles
 			</h2>
 

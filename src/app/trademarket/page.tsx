@@ -660,10 +660,10 @@ export default function TradeMarketPage() {
 				name={itemInfoName}
 			/>
 			{/* Main content */}
-			<div className="min-w-0 flex-1 space-y-4">
+			<div className="min-w-0 flex-1 space-y-4 order-last lg:order-0">
 				<div className="flex flex-col gap-3">
 					<div className="flex flex-col gap-3">
-						<div className="flex items-center gap-2">
+						<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
 							<ItemSearchInput
 								value={searchQuery}
 								onChange={setSearchQuery}
@@ -684,6 +684,7 @@ export default function TradeMarketPage() {
 							<Button
 								variant="outline"
 								size="sm"
+								className="min-h-9 sm:min-h-0 w-full sm:w-auto shrink-0"
 								onClick={() => {
 									setAppliedSearch(searchQuery.trim());
 									setPage(1);
@@ -694,13 +695,13 @@ export default function TradeMarketPage() {
 							</Button>
 						</div>
 
-						<div className="flex flex-1 flex-wrap items-center justify-between gap-2">
-							<div className="flex rounded-lg border border-border/50 p-0.5">
+						<div className="flex sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-2">
+							<div className="flex rounded-lg border border-border/50 p-0.5 w-fit shrink-0">
 								<button
 									type="button"
 									onClick={() => setTab("popular")}
 									className={cn(
-										"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+										"rounded-md px-3 py-2 sm:py-1.5 text-sm font-medium transition-colors min-h-9 sm:min-h-0",
 										tab === "popular"
 											? "bg-primary text-primary-foreground"
 											: "text-muted-foreground hover:text-foreground",
@@ -712,7 +713,7 @@ export default function TradeMarketPage() {
 									type="button"
 									onClick={() => setTab("newly_listed")}
 									className={cn(
-										"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+										"rounded-md px-3 py-2 sm:py-1.5 text-sm font-medium transition-colors min-h-9 sm:min-h-0",
 										tab === "newly_listed"
 											? "bg-primary text-primary-foreground"
 											: "text-muted-foreground hover:text-foreground",
@@ -721,13 +722,13 @@ export default function TradeMarketPage() {
 									Newly Listed
 								</button>
 							</div>
-							<div className="flex items-center gap-2">
+							<div className="flex flex-wrap items-center gap-2 shrink-0">
 								{maxPage > 1 && (
 									<div className="flex items-center gap-0.5">
 										<Button
 											variant="outline"
 											size="sm"
-											className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+											className="h-9 w-9 sm:h-7 sm:w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
 											onClick={() => {
 												setPage((p) => Math.max(1, p - 1));
 												window.scrollTo({ top: 0, behavior: "smooth" });
@@ -742,7 +743,7 @@ export default function TradeMarketPage() {
 										<Button
 											variant="outline"
 											size="sm"
-											className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+											className="h-9 w-9 sm:h-7 sm:w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
 											onClick={() => {
 												setPage((p) => Math.min(maxPage, p + 1));
 												window.scrollTo({ top: 0, behavior: "smooth" });
@@ -756,6 +757,7 @@ export default function TradeMarketPage() {
 								<Button
 									variant="outline"
 									size="sm"
+									className="min-h-9 min-w-9 sm:min-h-0 sm:min-w-0 shrink-0"
 									onClick={() =>
 										tab === "popular" ? fetch(true) : fetchListings(true)
 									}
@@ -778,13 +780,13 @@ export default function TradeMarketPage() {
 					</div>
 				)}
 
-				<Table className="[&_tbody_td]:py-4">
+				<Table className="[&_tbody_td]:py-3 sm:[&_tbody_td]:py-4">
 					<TableHeader>
 						<TableRow>
 							<TableHead>
 								<button
 									type="button"
-									className="flex items-center hover:text-foreground"
+									className="flex items-center hover:text-foreground text-xs sm:text-sm"
 									onClick={() => toggleSort("name")}
 								>
 									Name
@@ -794,7 +796,7 @@ export default function TradeMarketPage() {
 							<TableHead className="text-right">
 								<button
 									type="button"
-									className="ml-auto flex items-center justify-end hover:text-foreground"
+									className="ml-auto flex items-center justify-end hover:text-foreground text-xs sm:text-sm"
 									onClick={() => toggleSort(isRankingData ? "lowest" : "price")}
 								>
 									{isRankingData ? "Lowest" : "Price"}
@@ -803,10 +805,10 @@ export default function TradeMarketPage() {
 							</TableHead>
 							{isRankingData && (
 								<>
-									<TableHead className="text-right">
+									<TableHead className="text-right hidden sm:table-cell">
 										<button
 											type="button"
-											className="ml-auto flex items-center justify-end hover:text-foreground"
+											className="ml-auto flex items-center justify-end hover:text-foreground text-xs sm:text-sm"
 											onClick={() => toggleSort("average")}
 										>
 											Average
@@ -816,7 +818,7 @@ export default function TradeMarketPage() {
 									<TableHead className="w-24 text-right">
 										<button
 											type="button"
-											className="ml-auto flex items-center justify-end hover:text-foreground"
+											className="ml-auto flex items-center justify-end hover:text-foreground text-xs sm:text-sm"
 											onClick={() => toggleSort("quantity")}
 										>
 											Quantity
@@ -829,7 +831,7 @@ export default function TradeMarketPage() {
 								<TableHead className="text-right">
 									<button
 										type="button"
-										className="ml-auto flex items-center justify-end hover:text-foreground"
+										className="ml-auto flex items-center justify-end hover:text-foreground text-xs sm:text-sm"
 										onClick={() => toggleSort("listed")}
 									>
 										Listed
@@ -849,7 +851,7 @@ export default function TradeMarketPage() {
 									<TableCell>
 										<Skeleton className="h-14 w-full rounded-md" />
 									</TableCell>
-									<TableCell>
+									<TableCell className="hidden sm:table-cell">
 										<Skeleton className="h-14 w-full rounded-md" />
 									</TableCell>
 									<TableCell>
@@ -934,7 +936,7 @@ export default function TradeMarketPage() {
 											<TableCell className="text-right font-mono">
 												<EmeraldPrice price={wynnInv.lowest_price} size="lg" />
 											</TableCell>
-											<TableCell className="text-right font-mono">
+											<TableCell className="text-right font-mono hidden sm:table-cell">
 												<EmeraldPrice price={wynnInv.average_price} size="lg" />
 											</TableCell>
 											<TableCell className="text-right text-lg tabular-nums font-mono">
@@ -1032,7 +1034,7 @@ export default function TradeMarketPage() {
 				</Table>
 
 				{!loading && pageItems.length > 0 && (
-					<div className="flex items-center pt-2 w-full">
+					<div className="flex flex-col sm:flex-row items-stretch sm:items-center pt-2 w-full gap-3">
 						<div className="flex-1 shrink-0 min-w-0 items-center gap-2 font-sans flex">
 							<p className="text-sm text-muted-foreground">Limit:</p>
 							<Select
@@ -1112,7 +1114,7 @@ export default function TradeMarketPage() {
 			</div>
 
 			{metadata && (
-				<aside className="sticky top-20 w-full shrink-0 lg:w-64   ">
+				<aside className="lg:sticky top-14 sm:top-20 w-full shrink-0 lg:w-64 order-first lg:order-0">
 					<div className="flex flex-col gap-3">
 						<div className="flex flex-wrap items-center justify-between gap-2">
 							{/* <div className="flex flex-wrap items-center gap-1.5">
@@ -1229,7 +1231,7 @@ export default function TradeMarketPage() {
 												max={metadata?.filters?.levelRange?.items ?? 110}
 												value={levelMinInput}
 												onChange={(e) => setLevelMinInput(e.target.value)}
-												className="h-8 w-20"
+												className="h-9 w-20 min-w-16 sm:h-8"
 											/>
 											<Input
 												type="number"
@@ -1238,7 +1240,7 @@ export default function TradeMarketPage() {
 												max={metadata?.filters?.levelRange?.items ?? 110}
 												value={levelMaxInput}
 												onChange={(e) => setLevelMaxInput(e.target.value)}
-												className="h-8 w-20"
+												className="h-9 w-20 min-w-16 sm:h-8"
 											/>
 											<Button
 												type="button"

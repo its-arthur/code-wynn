@@ -229,7 +229,7 @@ export default function MainPage() {
 	}, [anyLoading, setReady]);
 
 	return (
-		<div className="min-h-screen bg-background py-8 px-4">
+		<div className="min-h-screen bg-background py-4 sm:py-8 px-3 sm:px-4">
 			<main className="relative flex min-h-screen flex-col gap-4 items-center justify-center">
 				<div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full max-w-7xl mx-auto">
 					{FEATURED_USERNAMES.map((username) => (
@@ -249,17 +249,17 @@ export default function MainPage() {
 							alt="Wynncraft"
 							width={384}
 							height={384}
-							className="h-96 w-96 shrink-0 object-contain sm:h-96 sm:w-96"
+							className="h-40 w-40 shrink-0 object-contain sm:h-64 sm:w-64 xl:h-96 xl:w-96"
 						/>
 					</div>
 				</div>
-				<p className="absolute top-24 text-8xl font-pixel-circle text-white capitalize">
+				<p className="hidden sm:block sm:absolute top-20 sm:top-24 text-4xl sm:text-6xl lg:text-8xl font-pixel-circle text-white capitalize px-2 text-center max-w-full truncate">
 					project-wynn
 				</p>
 
 				<Button
 					variant="outline"
-					className="absolute top-4 right-4 z-10"
+					className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10"
 					size="icon"
 					onClick={() => {
 						FEATURED_USERNAMES.forEach((username) => {

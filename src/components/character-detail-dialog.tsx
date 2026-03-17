@@ -195,8 +195,8 @@ export function CharacterDetailDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[90vh] w-full sm:max-w-7xl overflow-hidden flex flex-col border-2 border-border/80 shadow-xl">
-				<DialogHeader className="flex flex-row items-start gap-3 border-b border-border/60 pb-4">
+			<DialogContent className="max-h-[90vh] w-[95vw] max-w-[95vw] sm:w-full sm:max-w-7xl overflow-hidden flex flex-col border-2 border-border/80 shadow-xl p-4 sm:p-6">
+				<DialogHeader className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 border-b border-border/60 pb-4">
 					<div className="min-w-0 flex-1 space-y-1">
 						<DialogTitle className="text-lg">Character</DialogTitle>
 						{characterEntries.length > 0 && (
@@ -204,7 +204,7 @@ export function CharacterDetailDialog({
 								value={selectedUuid ?? ""}
 								onValueChange={(value) => value && onSelectCharacter(value)}
 							>
-								<SelectTrigger className="min-h-14 w-full max-w-sm items-start gap-3 py-2 pl-2.5 pr-3 text-left">
+								<SelectTrigger className="min-h-14 w-full sm:max-w-sm items-start gap-3 py-2 pl-2.5 pr-3 text-left">
 									{selectedChar && !selectedUuid ? (
 										<>
 											<Image

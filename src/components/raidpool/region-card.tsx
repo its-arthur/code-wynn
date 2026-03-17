@@ -88,7 +88,7 @@ export function RegionCard({
 	};
 
 	return (
-		<div className="rounded-lg border border-border/50 bg-card max-w-4xl mx-auto">
+		<div className="rounded-lg border border-border/50 bg-card w-full max-w-4xl mx-auto">
 			{/* <div className="px-4 py-3">
 				<h3 className="font-semibold text-sm">{region}</h3>
 				{timestamp && (
@@ -119,7 +119,7 @@ export function RegionCard({
 								<h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
 									{group.group}
 								</h4>
-								<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+								<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
 									{group.loot_items.map((item, i) => {
 										const data = toCompletedDataFromGrouped(item);
 										return (
