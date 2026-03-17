@@ -14,8 +14,8 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-	title: "Code Wynn",
-	description: "Next.js with Tailwind, shadcn/ui and Zustand",
+	title: "project-wynn",
+	description: "Personal wynn related projects",
 };
 
 export const viewport: Viewport = {

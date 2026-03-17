@@ -225,7 +225,6 @@ export default function MainPage() {
 	return (
 		<div className="min-h-screen bg-background py-8 px-4">
 			<main className="relative flex min-h-screen flex-col gap-4 items-center justify-center">
-
 				<div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full max-w-7xl mx-auto">
 					{FEATURED_USERNAMES.map((username) => (
 						<FeaturedPlayerSection
@@ -246,6 +245,9 @@ export default function MainPage() {
 						/>
 					</div>
 				</div>
+				<p className="absolute top-24 text-8xl font-pixel-circle text-white capitalize">
+					project-wynn
+				</p>
 
 				<Button
 					variant="outline"

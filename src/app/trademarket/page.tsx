@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
 	ArrowDown,
@@ -8,6 +8,7 @@ import {
 	ArrowUpDown,
 	Check,
 	ChevronDown,
+	Info,
 	Loader2,
 	RefreshCw,
 	Search,
@@ -42,6 +43,7 @@ import type { ItemMetadata } from "@/types/item";
 import type {
 	MergedPopularEntry,
 	MergedNewlyListedEntry,
+	CompletedData,
 } from "@/types/wynnventory/trademarket";
 import type { ItemEntry } from "@/types/item";
 import { ItemIcon } from "@/lib/item-icons";
@@ -51,6 +53,7 @@ import { Input } from "@/components/ui/input";
 import { cn, tierRoman, formatTimeElapsed } from "@/lib/utils";
 import { getRarityStyles } from "@/lib/rarity-color";
 import { resolveWynnData } from "@/lib/resolve-wynn-item";
+import { ItemInfo } from "@/components/item-info";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 
@@ -97,6 +100,21 @@ function isMaterialType(type: string | undefined): boolean {
 	if (!type) return false;
 	const t = type.toLowerCase();
 	return MATERIAL_TYPES.includes(t);
+}
+
+/** Item types that should not show the item info button */
+function isItemInfoHiddenType(type: string | undefined, subType?: string): boolean {
+	const t = (type ?? "").toLowerCase();
+	const s = (subType ?? "").toLowerCase();
+	return (
+		t === "key" ||
+		t === "enchanter" ||
+		t === "other" ||
+		s === "other" ||
+		t === "emeraldpouch" ||
+		t === "mounts" ||
+		t.includes("mount")
+	);
 }
 
 function getItemTypeDisplay(item: ItemEntry | undefined): string | undefined {
@@ -626,8 +644,21 @@ export default function TradeMarketPage() {
 		});
 	}, [pageItems]);
 
+	const [itemInfoOpen, setItemInfoOpen] = useState(false);
+	const [itemInfoName, setItemInfoName] = useState<string | null>(null);
+
+	const openItemInfo = useCallback((name: string) => {
+		setItemInfoName(name);
+		setItemInfoOpen(true);
+	}, []);
+
 	return (
 		<div className="flex flex-col gap-6 lg:flex-row lg:items-start relative">
+			<ItemInfo
+				open={itemInfoOpen}
+				onOpenChange={setItemInfoOpen}
+				name={itemInfoName}
+			/>
 			{/* Main content */}
 			<div className="min-w-0 flex-1 space-y-4">
 				<div className="flex flex-col gap-3">
@@ -835,7 +866,7 @@ export default function TradeMarketPage() {
 									const rarity = raw
 										? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
 										: "";
-									const { text } = getRarityStyles(rarity);
+									const { text, border } = getRarityStyles(rarity);
 									return (
 										<TableRow
 											key={m.name + m.tier}
@@ -847,13 +878,29 @@ export default function TradeMarketPage() {
 											}}
 										>
 											<TableCell
-												className={cn("flex items-center gap-2 font-sans")}
+												className={cn("flex items-center gap-4 font-sans")}
 											>
-												<ItemIcon
-													item={wynn ?? m.name}
-													alt={m.name}
-													className="size-12"
-												/>
+												<div className={cn("relative rounded-md border-2 p-2", border)}>
+													<ItemIcon
+														item={wynn ?? m.name}
+														alt={m.name}
+														className="size-12"
+													/>
+													{!isItemInfoHiddenType(wynn?.type, wynn?.subType) && (
+														<button
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																openItemInfo(m.name);
+															}}
+															className="absolute bottom-0 right-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+															aria-label="View item info"
+														>
+															<Info className="size-4" />
+														</button>
+													)}
+												</div>
+
 												<div className="min-w-0">
 													<span
 														className={cn(

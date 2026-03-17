@@ -142,10 +142,12 @@ export function ItemInfo({
 	open,
 	onOpenChange,
     completedData: completedDataProp,
+    name: nameProp,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
         completedData?: CompletedData | null;
+        name?: string | null;
 }) {
 	const [fetchedItem, setFetchedItem] = useState<ItemEntry | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -153,7 +155,7 @@ export function ItemInfo({
     const [aspectData, setAspectData] = useState<AspectEntry | null>(null);
 
     const hasCompletedData = completedDataProp != null;
-    const name = completedDataProp?.wynnInv.name ?? "";
+    const name = nameProp ?? completedDataProp?.wynnInv.name ?? "";
     const itemProp = hasCompletedData ? toItemFromCompletedData(completedDataProp) : null;
 	const item = itemProp ?? fetchedItem;
 
