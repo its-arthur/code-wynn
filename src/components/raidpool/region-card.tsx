@@ -1,8 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { resolveWynnData } from "@/lib/resolve-wynn-item";
 import { RaidItem } from "./raid-item";
 import type { ItemEntry } from "@/types/item";
@@ -59,8 +56,6 @@ export function RegionCard({
 	groups,
 	itemDb,
 }: RegionCardProps) {
-	const [open, setOpen] = useState(true);
-
 	const toCompletedData = (
 		item: WynnventoryItem,
 		tier: number | null = null,
@@ -91,60 +86,46 @@ export function RegionCard({
 	};
 
 	return (
-		<div className="rounded-lg border border-border/50 bg-card">
-			<button
-				type="button"
-				onClick={() => setOpen(!open)}
-				className="flex w-full items-center justify-between px-4 py-3 text-left"
-			>
-				<div>
-					<h3 className="font-semibold text-sm">{region}</h3>
-					{timestamp && (
-						<p className="text-[11px] text-muted-foreground">{timestamp}</p>
-					)}
-				</div>
-				<ChevronDown
-					className={cn(
-						"size-4 text-muted-foreground transition-transform",
-						open && "rotate-180",
-					)}
-				/>
-			</button>
+		<div className="rounded-lg border border-border/50 bg-card max-w-4xl mx-auto">
+			<div className="px-4 py-3">
+				<h3 className="font-semibold text-sm">{region}</h3>
+				{timestamp && (
+					<p className="text-[11px] text-muted-foreground">{timestamp}</p>
+				)}
+			</div>
 
-			{open && (
-				<div className="border-t border-border/30 px-4 pb-4 pt-3">
-					{items && (
-						<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-							{sortByRarity(items).map((item, i) => (
-								<RaidItem
-									key={`${item.name}-${i}`}
-									completedData={toCompletedData(item)}
-								/>
-							))}
-						</div>
-					)}
+			<div className="border-t border-border/30 px-4 pb-4 pt-3">
+				{items && (
+					<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+						{sortByRarity(items).map((item, i) => (
+							<RaidItem
+								key={`${item.name}-${i}`}
+								completedData={toCompletedData(item)}
+							/>
+						))}
+					</div>
+				)}
 
-					{groups && (
-						<div className="space-y-4">
-							{groups.map((group) => (
-								<div key={group.group}>
-									<h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-										{group.group}
-									</h4>
-									<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-										{group.loot_items.map((item, i) => (
-											<RaidItem
-												key={`${item.name}-${i}`}
-												completedData={toCompletedDataFromGrouped(item)}
-											/>
-										))}
-									</div>
+				{groups && (
+					<div className="space-y-4">
+						{groups.map((group) => (
+							<div key={group.group}>
+								<h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+									{group.group}
+								</h4>
+								<div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+									{group.loot_items.map((item, i) => (
+										<RaidItem
+											key={`${item.name}-${i}`}
+											completedData={toCompletedDataFromGrouped(item)}
+										/>
+									))}
 								</div>
-							))}
-						</div>
-					)}
-				</div>
-			)}
+							</div>
+						))}
+					</div>
+				)}
+			</div>
 		</div>
 	);
 }

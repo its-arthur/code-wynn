@@ -8,8 +8,7 @@ import { Home, Package, Swords, Coins, Store } from "lucide-react";
 const navItems = [
 	{ href: "/", label: "Home", icon: Home },
 	// { href: "/items", label: "Items", icon: Package },
-	{ href: "/raidpool", label: "Raids", icon: Swords },
-	{ href: "/lootpool", label: "Lootpool", icon: Coins },
+	{ href: "/rewards", label: "Rewards", icon: Coins },
 	{ href: "/trademarket", label: "Market", icon: Store },
 ] as const;
 
